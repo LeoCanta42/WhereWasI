@@ -28,8 +28,9 @@ const progressText = computed(() => formatProgressDisplay(props.item))
 const shortProgressText = computed(() => formatProgressDisplay(props.item, true))
 const gradientClass = computed(() => getMediaGradient(props.item.media_type, props.item.id))
 
-const isSeriesOrAnime = computed(() => props.item.media_type === 'series' || props.item.media_type === 'anime')
-const isBookOrManga = computed(() => props.item.media_type === 'book' || props.item.media_type === 'manga')
+const isSeries = computed(() => props.item.media_type === 'series')
+const isBook = computed(() => props.item.media_type === 'book')
+const isMovie = computed(() => props.item.media_type === 'movie' || props.item.progress_type === 'time')
 </script>
 
 <template>
@@ -151,15 +152,15 @@ const isBookOrManga = computed(() => props.item.media_type === 'book' || props.i
             <UIcon name="i-lucide-minus" class="h-3.5 w-3.5" />
           </button>
 
-          <!-- Increment +1 / +10 -->
+          <!-- Increment +1 / +10m / +10 Pag -->
           <button
             type="button"
             class="inline-flex h-8 items-center gap-1 rounded-xl bg-indigo-50 px-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 active:scale-95 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
-            :title="isSeriesOrAnime ? '+1 Episodio' : isBookOrManga ? '+10 Pagine' : '+1 Avanzamento'"
+            :title="isSeries ? '+1 Episodio' : isMovie ? '+10 Minuti' : isBook ? '+10 Pagine' : '+1 Avanzamento'"
             @click="emit('increment', item)"
           >
             <UIcon name="i-lucide-plus" class="h-3.5 w-3.5" />
-            <span>{{ isSeriesOrAnime ? '+1 Ep' : isBookOrManga ? '+10 Pag' : '+1' }}</span>
+            <span>{{ isSeries ? '+1 Ep' : isMovie ? '+10m' : isBook ? '+10 Pag' : '+1' }}</span>
           </button>
         </div>
 

@@ -86,13 +86,16 @@ export interface Database {
           id: number
           user_id: string
           title: string
-          media_type: 'series' | 'book' | 'movie' | 'anime' | 'manga' | 'game' | 'podcast' | 'other'
+          media_type: 'series' | 'book' | 'movie' | 'game' | 'other'
           status: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
-          progress_type: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'custom'
+          progress_type: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
           season: number | null
           episode: number | null
           total_seasons: number | null
           total_episodes: number | null
+          season_episodes: Record<string, number> | null
+          time_stopped: string | null
+          total_duration: string | null
           current_page: number | null
           total_pages: number | null
           percentage: number | null
@@ -114,13 +117,16 @@ export interface Database {
           id?: number
           user_id?: string
           title: string
-          media_type?: 'series' | 'book' | 'movie' | 'anime' | 'manga' | 'game' | 'podcast' | 'other'
+          media_type?: 'series' | 'book' | 'movie' | 'game' | 'other'
           status?: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
-          progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'custom'
+          progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
           season?: number | null
           episode?: number | null
           total_seasons?: number | null
           total_episodes?: number | null
+          season_episodes?: Record<string, number> | null
+          time_stopped?: string | null
+          total_duration?: string | null
           current_page?: number | null
           total_pages?: number | null
           percentage?: number | null
@@ -142,13 +148,16 @@ export interface Database {
           id?: number
           user_id?: string
           title?: string
-          media_type?: 'series' | 'book' | 'movie' | 'anime' | 'manga' | 'game' | 'podcast' | 'other'
+          media_type?: 'series' | 'book' | 'movie' | 'game' | 'other'
           status?: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
-          progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'custom'
+          progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
           season?: number | null
           episode?: number | null
           total_seasons?: number | null
           total_episodes?: number | null
+          season_episodes?: Record<string, number> | null
+          time_stopped?: string | null
+          total_duration?: string | null
           current_page?: number | null
           total_pages?: number | null
           percentage?: number | null

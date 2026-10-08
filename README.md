@@ -1,15 +1,16 @@
 # WhereWasI? 📺 📖 🎬
 
-**WhereWasI?** è una moderna Single Page Application (PWA) costruita con **Nuxt 4**, **Vue 3**, **Nuxt UI (Tailwind CSS v4)** e **Supabase**. Permette a te e ai tuoi amici di tenere traccia di serie TV (stagione ed episodio attuale), libri (pagina corrente o percentuale), film, anime, manga e videogiochi, con una lista personale e la possibilità di vedere i progressi e le attività dei tuoi amici quando vi collegate in-app!
+**WhereWasI?** è una moderna Single Page Application (PWA) costruita con **Nuxt 4**, **Vue 3**, **Nuxt UI (Tailwind CSS v4)** e **Supabase**. Permette a te e ai tuoi amici di tenere traccia di serie TV (stagione ed episodio attuale), libri (pagina corrente o percentuale), film e videogiochi, con una lista personale e la possibilità di vedere i progressi e le attività dei tuoi amici quando vi collegate in-app!
 
 ---
 
 ## ✨ Funzionalità Principali
 
 ### 🎯 1. Tracciamento Personale Intelligente
-- **Serie TV & Anime**: contatore puntuale di Stagione ed Episodio (`S3 E5`), totale episodi e pulsante rapido `+1 Ep` direttamente sulle card o nella modale.
-- **Libri & Manga**: avanzamento in pagine (`p. 240 / 480 (50%)`) o capitoli con pulsanti rapidi `+10 Pag` e `+1`.
-- **Film, Giochi e Altro**: avanzamento percentuale (`0-100%`) e note di avanzamento personalizzate.
+- **Serie TV**: contatore puntuale di Stagione ed Episodio (`S3 E5`), configurazione episodi per singola stagione, avanzamento automatico alla stagione successiva e pulsante rapido `+1 Ep`.
+- **Libri**: avanzamento in pagine (`p. 240 / 480 (50%)`) con pulsanti rapidi `+10 Pag` e `+1`.
+- **Film**: minutaggio e tempo di interruzione (es. `1h 25m / 2h 10m`) con avanzamento rapido `+10m`.
+- **Videogiochi e Altro**: avanzamento percentuale (`0-100%`) e note di avanzamento personalizzate.
 - **Stati di avanzamento**: *In Corso*, *Da Iniziare*, *Completato*, *In Pausa*, *Abbandonato*.
 - **Valutazioni e Recensioni**: voti da 1 a 10 ⭐ e note/recensioni personali.
 - **Privacy per singolo elemento**: flag `🔒 Privato` per nascondere determinati elementi dagli amici.

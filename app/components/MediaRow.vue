@@ -25,8 +25,9 @@ const statusInfo = computed(() => getMediaStatusInfo(props.item.status))
 const progressPct = computed(() => calculateProgressPercentage(props.item))
 const progressText = computed(() => formatProgressDisplay(props.item, true))
 
-const isSeriesOrAnime = computed(() => props.item.media_type === 'series' || props.item.media_type === 'anime')
-const isBookOrManga = computed(() => props.item.media_type === 'book' || props.item.media_type === 'manga')
+const isSeries = computed(() => props.item.media_type === 'series')
+const isBook = computed(() => props.item.media_type === 'book')
+const isMovie = computed(() => props.item.media_type === 'movie' || props.item.progress_type === 'time')
 </script>
 
 <template>
@@ -77,7 +78,7 @@ const isBookOrManga = computed(() => props.item.media_type === 'book' || props.i
         <button
           type="button"
           class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          title="Diminuisci progresso"
+          :title="isMovie ? 'Diminuisci tempo (-10m)' : 'Diminuisci progresso'"
           @click="emit('decrement', item)"
         >
           <UIcon name="i-lucide-minus" class="h-3.5 w-3.5" />
@@ -86,11 +87,11 @@ const isBookOrManga = computed(() => props.item.media_type === 'book' || props.i
         <button
           type="button"
           class="inline-flex h-8 items-center gap-1 rounded-xl bg-indigo-50 px-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
-          :title="isSeriesOrAnime ? '+1 Episodio' : isBookOrManga ? '+10 Pagine' : '+1 Avanzamento'"
+          :title="isSeries ? '+1 Episodio' : isMovie ? '+10 Minuti' : isBook ? '+10 Pagine' : '+1 Avanzamento'"
           @click="emit('increment', item)"
         >
           <UIcon name="i-lucide-plus" class="h-3.5 w-3.5" />
-          <span>{{ isSeriesOrAnime ? '+1' : isBookOrManga ? '+10' : '+1' }}</span>
+          <span>{{ isSeries ? '+1' : isMovie ? '+10m' : isBook ? '+10' : '+1' }}</span>
         </button>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import type { Database } from '~/types/database.types'
 import type { MediaItem, MediaStatus, MediaType, ProgressType } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
-import { formatProgressDisplay } from '~/utils/media'
+import { formatProgressDisplay, getEpisodesForSeason, parseTimeToMinutes, formatMinutesToTime } from '~/utils/media'
 
 export function useMediaTracker() {
   const supabase = useSupabaseClient<Database>()
@@ -138,7 +138,9 @@ export function useMediaTracker() {
           oldItem.episode !== updated.episode ||
           oldItem.season !== updated.season ||
           oldItem.current_page !== updated.current_page ||
-          oldItem.percentage !== updated.percentage
+          oldItem.percentage !== updated.percentage ||
+          oldItem.time_stopped !== updated.time_stopped ||
+          oldItem.current_unit !== updated.current_unit
         const isStatusChanged = oldItem.status !== updated.status
         const isCompleted = updated.status === 'completed' && oldItem.status !== 'completed'
 
@@ -220,15 +222,63 @@ export function useMediaTracker() {
   async function incrementProgress(item: MediaItem, step = 1): Promise<void> {
     const updates: Partial<MediaItem> = {}
 
-    if (item.media_type === 'series' || item.media_type === 'anime' || item.progress_type === 'episode_season') {
-      const nextEp = (item.episode ?? 0) + step
-      updates.episode = nextEp
+    if (item.media_type === 'series' || item.progress_type === 'episode_season') {
+      const currentSeason = item.season ?? 1
+      const currentEp = item.episode ?? 0
+      const totalSeasons = item.total_seasons
+      const seasonMaxEp = getEpisodesForSeason(item, currentSeason) ?? item.total_episodes
+
       if (item.status === 'planned') {
         updates.status = 'in_progress'
       }
-      if (item.total_episodes && nextEp >= item.total_episodes) {
-        updates.status = 'completed'
-        updates.completed_at = new Date().toISOString()
+
+      // Check if advancing reaches or exceeds the current season's episode limit
+      if (seasonMaxEp && currentEp + step > seasonMaxEp) {
+        // Season completed! Check if this was the last season
+        if (totalSeasons && currentSeason >= totalSeasons) {
+          updates.season = currentSeason
+          updates.episode = seasonMaxEp
+          updates.status = 'completed'
+          updates.completed_at = new Date().toISOString()
+        } else {
+          // Move to next season!
+          const nextSeason = currentSeason + 1
+          updates.season = nextSeason
+          updates.episode = 1
+          const nextSeasonEp = getEpisodesForSeason(item, nextSeason)
+          if (nextSeasonEp) {
+            updates.total_episodes = nextSeasonEp
+          }
+        }
+      } else {
+        const nextEp = currentEp + step
+        updates.episode = nextEp
+        // If it was the final episode of the final season
+        if (seasonMaxEp && nextEp >= seasonMaxEp && totalSeasons && totalSeasons <= currentSeason) {
+          updates.status = 'completed'
+          updates.completed_at = new Date().toISOString()
+        }
+      }
+    } else if (item.media_type === 'movie' || item.progress_type === 'time') {
+      const currentMin = parseTimeToMinutes(item.time_stopped || item.current_unit)
+      const stepMinutes = 10 // +10 minutes per click
+      const newMinutes = currentMin + stepMinutes
+      const formatted = formatMinutesToTime(newMinutes)
+
+      updates.time_stopped = formatted
+      updates.current_unit = formatted
+      if (item.status === 'planned') {
+        updates.status = 'in_progress'
+      }
+
+      if (item.total_duration) {
+        const totMin = parseTimeToMinutes(item.total_duration)
+        if (totMin > 0 && newMinutes >= totMin) {
+          updates.time_stopped = item.total_duration
+          updates.current_unit = item.total_duration
+          updates.status = 'completed'
+          updates.completed_at = new Date().toISOString()
+        }
       }
     } else if (item.media_type === 'book' || item.progress_type === 'pages') {
       const nextP = (item.current_page ?? 0) + step
@@ -258,8 +308,32 @@ export function useMediaTracker() {
   async function decrementProgress(item: MediaItem, step = 1): Promise<void> {
     const updates: Partial<MediaItem> = {}
 
-    if (item.media_type === 'series' || item.media_type === 'anime' || item.progress_type === 'episode_season') {
-      updates.episode = Math.max(0, (item.episode ?? 0) - step)
+    if (item.media_type === 'series' || item.progress_type === 'episode_season') {
+      const currentSeason = item.season ?? 1
+      const currentEp = item.episode ?? 0
+
+      if (currentEp - step < 1 && currentSeason > 1) {
+        // Go back to previous season's last episode
+        const prevSeason = currentSeason - 1
+        const prevMaxEp = getEpisodesForSeason(item, prevSeason) ?? 1
+        updates.season = prevSeason
+        updates.episode = prevMaxEp
+        updates.total_episodes = prevMaxEp
+      } else {
+        updates.episode = Math.max(0, currentEp - step)
+      }
+
+      if (item.status === 'completed') {
+        updates.status = 'in_progress'
+      }
+    } else if (item.media_type === 'movie' || item.progress_type === 'time') {
+      const currentMin = parseTimeToMinutes(item.time_stopped || item.current_unit)
+      const stepMinutes = 10
+      const newMinutes = Math.max(0, currentMin - stepMinutes)
+      const formatted = formatMinutesToTime(newMinutes)
+
+      updates.time_stopped = formatted
+      updates.current_unit = formatted
       if (item.status === 'completed') {
         updates.status = 'in_progress'
       }
@@ -299,6 +373,12 @@ export function useMediaTracker() {
       if (item.percentage !== null) {
         updates.percentage = 100
       }
+      if (item.media_type === 'movie' || item.progress_type === 'time') {
+        if (item.total_duration) {
+          updates.time_stopped = item.total_duration
+          updates.current_unit = item.total_duration
+        }
+      }
     }
     await updateItem(item.id, updates)
   }
@@ -310,17 +390,17 @@ export function useMediaTracker() {
     const planned = all.filter((i) => i.status === 'planned')
     const favorites = all.filter((i) => i.is_favorite)
 
-    const seriesWatching = inProgress.filter((i) => i.media_type === 'series' || i.media_type === 'anime').length
-    const seriesCompleted = completed.filter((i) => i.media_type === 'series' || i.media_type === 'anime').length
-    const booksReading = inProgress.filter((i) => i.media_type === 'book' || i.media_type === 'manga').length
-    const booksCompleted = completed.filter((i) => i.media_type === 'book' || i.media_type === 'manga').length
+    const seriesWatching = inProgress.filter((i) => i.media_type === 'series').length
+    const seriesCompleted = completed.filter((i) => i.media_type === 'series').length
+    const booksReading = inProgress.filter((i) => i.media_type === 'book').length
+    const booksCompleted = completed.filter((i) => i.media_type === 'book').length
     const moviesWatched = completed.filter((i) => i.media_type === 'movie').length
 
     let totalEpisodes = 0
     let totalPages = 0
 
     for (const item of all) {
-      if (item.media_type === 'series' || item.media_type === 'anime') {
+      if (item.media_type === 'series') {
         totalEpisodes += item.episode ?? 0
       } else if (item.media_type === 'book') {
         totalPages += item.current_page ?? 0

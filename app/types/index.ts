@@ -1,8 +1,8 @@
-export type MediaType = 'series' | 'book' | 'movie' | 'anime' | 'manga' | 'game' | 'podcast' | 'other'
+export type MediaType = 'series' | 'book' | 'movie' | 'game' | 'other'
 
 export type MediaStatus = 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
 
-export type ProgressType = 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'custom'
+export type ProgressType = 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
 
 export type ApprovalStatus = 'unknown' | 'approved' | 'pending'
 
@@ -17,6 +17,9 @@ export interface MediaItem {
   episode: number | null
   total_seasons: number | null
   total_episodes: number | null
+  season_episodes?: Record<string, number> | null
+  time_stopped?: string | null
+  total_duration?: string | null
   current_page: number | null
   total_pages: number | null
   percentage: number | null

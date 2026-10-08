@@ -12,10 +12,7 @@ export const MEDIA_TYPES: MediaTypeOption[] = [
   { id: 'series', label: 'Serie TV', icon: 'i-lucide-tv', color: 'indigo', unitDefault: 'Episodio' },
   { id: 'book', label: 'Libro', icon: 'i-lucide-book-open', color: 'emerald', unitDefault: 'Pagina' },
   { id: 'movie', label: 'Film', icon: 'i-lucide-clapperboard', color: 'amber', unitDefault: 'Visione' },
-  { id: 'anime', label: 'Anime', icon: 'i-lucide-sparkles', color: 'rose', unitDefault: 'Episodio' },
-  { id: 'manga', label: 'Manga / Fumetto', icon: 'i-lucide-book-marked', color: 'violet', unitDefault: 'Capitolo' },
   { id: 'game', label: 'Videogioco', icon: 'i-lucide-gamepad-2', color: 'cyan', unitDefault: 'Progresso' },
-  { id: 'podcast', label: 'Podcast', icon: 'i-lucide-mic', color: 'teal', unitDefault: 'Puntata' },
   { id: 'other', label: 'Altro', icon: 'i-lucide-bookmark', color: 'slate', unitDefault: 'Avanzamento' }
 ]
 
@@ -43,11 +40,116 @@ export function getMediaStatusInfo(status: MediaStatus): StatusOption {
 }
 
 /**
+ * Parses time formats such as "1h 25m", "1h25m", "1:25:00", "01:25", "85m", "85" into total minutes.
+ */
+export function parseTimeToMinutes(timeStr?: string | null): number {
+  if (!timeStr) return 0
+  const s = String(timeStr).trim().toLowerCase()
+  if (!s) return 0
+
+  // Match "1h 25m", "1h25m", "1h 25", "1h", "25m", "90m", "90 min"
+  const hMatch = s.match(/(\d+)\s*h/)
+  const mMatch = s.match(/(\d+)\s*(?:m|min)/)
+
+  if (hMatch || mMatch) {
+    const hours = (hMatch && hMatch[1]) ? parseInt(hMatch[1], 10) : 0
+    const minutes = (mMatch && mMatch[1]) ? parseInt(mMatch[1], 10) : 0
+    return hours * 60 + minutes
+  }
+
+  // Match "hh:mm:ss" or "hh:mm"
+  if (s.includes(':')) {
+    const parts = s.split(':').map((p) => parseInt(p, 10) || 0)
+    if (parts.length === 3) {
+      const p0 = parts[0] ?? 0
+      const p1 = parts[1] ?? 0
+      const p2 = parts[2] ?? 0
+      return p0 * 60 + p1 + Math.round(p2 / 60)
+    } else if (parts.length === 2) {
+      const p0 = parts[0] ?? 0
+      const p1 = parts[1] ?? 0
+      return p0 * 60 + p1
+    }
+  }
+
+  // Pure number of minutes
+  const num = parseInt(s, 10)
+  if (!isNaN(num)) {
+    return num
+  }
+
+  return 0
+}
+
+/**
+ * Formats a total number of minutes into a human string (e.g. 85 -> "1h 25m", 45 -> "45m")
+ */
+export function formatMinutesToTime(totalMinutes: number): string {
+  if (!totalMinutes || totalMinutes <= 0) return '0m'
+  const hours = Math.floor(totalMinutes / 60)
+  const mins = Math.round(totalMinutes % 60)
+
+  if (hours > 0 && mins > 0) {
+    return `${hours}h ${mins.toString().padStart(2, '0')}m`
+  } else if (hours > 0) {
+    return `${hours}h 00m`
+  } else {
+    return `${mins}m`
+  }
+}
+
+/**
+ * Splits total minutes into separate hours and minutes components
+ */
+export function splitMinutesToHoursAndMinutes(totalMinutes: number): { hours: number; minutes: number } {
+  if (!totalMinutes || totalMinutes <= 0) return { hours: 0, minutes: 0 }
+  return {
+    hours: Math.floor(totalMinutes / 60),
+    minutes: Math.round(totalMinutes % 60)
+  }
+}
+
+/**
+ * Retrieves the number of episodes for a specific season of a series.
+ */
+export function getEpisodesForSeason(item: Partial<MediaItem>, seasonNum?: number): number | null {
+  const targetSeason = seasonNum ?? item.season ?? 1
+  if (item.season_episodes && typeof item.season_episodes === 'object') {
+    const epCount = (item.season_episodes as any)[String(targetSeason)] ?? (item.season_episodes as any)[targetSeason]
+    const parsed = typeof epCount === 'number' ? epCount : parseInt(String(epCount), 10)
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed
+    }
+  }
+  if ((item.season ?? 1) === targetSeason && item.total_episodes && item.total_episodes > 0) {
+    return item.total_episodes
+  }
+  return null
+}
+
+/**
  * Calculates a 0-100 percentage of the progress for visual bars and stats.
  */
 export function calculateProgressPercentage(item: Partial<MediaItem>): number {
   if (item.status === 'completed') return 100
   if (item.status === 'planned') return 0
+
+  // Movie / Time progress
+  if (item.media_type === 'movie' || item.progress_type === 'time') {
+    const stopped = item.time_stopped || item.current_unit
+    const total = item.total_duration
+    if (stopped && total) {
+      const stopMins = parseTimeToMinutes(stopped)
+      const totMins = parseTimeToMinutes(total)
+      if (totMins > 0) {
+        return Math.min(100, Math.max(0, Math.round((stopMins / totMins) * 100)))
+      }
+    }
+    if (item.percentage !== null && item.percentage !== undefined && item.percentage >= 0) {
+      return Math.min(100, Math.max(0, item.percentage))
+    }
+    return 0
+  }
 
   if (item.percentage !== null && item.percentage !== undefined && item.percentage >= 0) {
     return Math.min(100, Math.max(0, item.percentage))
@@ -61,9 +163,12 @@ export function calculateProgressPercentage(item: Partial<MediaItem>): number {
   }
 
   // Series episodes progress
-  if (item.media_type === 'series' || item.media_type === 'anime' || item.progress_type === 'episode_season') {
-    if (item.episode && item.total_episodes && item.total_episodes > 0) {
-      return Math.min(100, Math.round((item.episode / item.total_episodes) * 100))
+  if (item.media_type === 'series' || item.progress_type === 'episode_season') {
+    const season = item.season ?? 1
+    const ep = item.episode ?? 0
+    const seasonEpCount = getEpisodesForSeason(item, season) ?? item.total_episodes
+    if (ep > 0 && seasonEpCount && seasonEpCount > 0) {
+      return Math.min(100, Math.round((ep / seasonEpCount) * 100))
     }
   }
 
@@ -72,24 +177,48 @@ export function calculateProgressPercentage(item: Partial<MediaItem>): number {
 
 /**
  * Formats a clean, human-readable progress string, e.g.:
- * - "Stagione 3 • Episodio 5" / "S3 E5"
+ * - "Stagione 3, Ep. 5 / 10" / "S3 E5/10"
+ * - "1h 25m / 2h 10m" / "1h 25m"
  * - "Pagina 240 di 480 (50%)"
  * - "Capitolo 12"
- * - "Completato"
+ * - "Completato" / "Visto" / "Letto"
  */
 export function formatProgressDisplay(item: Partial<MediaItem>, short = false): string {
   if (item.status === 'completed') {
-    return item.media_type === 'book' ? 'Letto' : 'Completato'
+    if (item.media_type === 'book') return 'Letto'
+    if (item.media_type === 'movie') return 'Visto'
+    return 'Completato'
   }
 
   if (item.status === 'planned') {
-    return item.media_type === 'book' ? 'Da leggere' : 'Da guardare'
+    if (item.media_type === 'book') return 'Da leggere'
+    if (item.media_type === 'movie') return 'Da guardare'
+    return 'Da iniziare'
   }
 
-  if (item.media_type === 'series' || item.media_type === 'anime' || item.progress_type === 'episode_season') {
+  // Movie / Time progress
+  if (item.media_type === 'movie' || item.progress_type === 'time') {
+    const stopped = item.time_stopped || item.current_unit
+    const total = item.total_duration
+    if (stopped && total) {
+      const stopMins = parseTimeToMinutes(stopped)
+      const totMins = parseTimeToMinutes(total)
+      const pct = totMins > 0 ? Math.round((stopMins / totMins) * 100) : 0
+      if (short) {
+        return `${stopped} / ${total}`
+      }
+      return `Fermato a ${stopped} / ${total}${pct > 0 ? ` (${pct}%)` : ''}`
+    }
+    if (stopped) {
+      return short ? stopped : `Fermato a ${stopped}`
+    }
+    return 'In corso'
+  }
+
+  if (item.media_type === 'series' || item.progress_type === 'episode_season') {
     const s = item.season ?? 1
     const ep = item.episode ?? 0
-    const totalEp = item.total_episodes
+    const totalEp = getEpisodesForSeason(item, s) ?? item.total_episodes
 
     if (short) {
       return totalEp ? `S${s} E${ep}/${totalEp}` : `S${s} E${ep}`
@@ -107,7 +236,7 @@ export function formatProgressDisplay(item: Partial<MediaItem>, short = false): 
     return short ? `p. ${p}` : `Pagina ${p}`
   }
 
-  if (item.progress_type === 'chapter' || item.media_type === 'manga') {
+  if (item.progress_type === 'chapter') {
     const p = item.current_page ?? item.episode ?? 0
     return `Cap. ${p}`
   }
@@ -143,25 +272,10 @@ export function getMediaGradient(type: MediaType, id: number | string = 1): stri
       'from-rose-600 to-amber-700',
       'from-orange-500 to-red-800'
     ],
-    anime: [
-      'from-rose-500 to-pink-700',
-      'from-fuchsia-600 to-purple-800',
-      'from-pink-600 to-rose-900'
-    ],
-    manga: [
-      'from-purple-600 to-pink-700',
-      'from-violet-700 to-fuchsia-900',
-      'from-indigo-600 to-violet-900'
-    ],
     game: [
       'from-cyan-600 to-blue-800',
       'from-sky-500 to-indigo-700',
       'from-teal-500 to-blue-900'
-    ],
-    podcast: [
-      'from-teal-600 to-emerald-800',
-      'from-cyan-700 to-teal-950',
-      'from-blue-600 to-teal-800'
     ],
     other: [
       'from-slate-600 to-zinc-800',

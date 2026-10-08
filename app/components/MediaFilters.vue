@@ -27,9 +27,8 @@ const typeTabs = computed(() => [
   { id: 'series', label: 'Serie TV', icon: 'i-lucide-tv' },
   { id: 'book', label: 'Libri', icon: 'i-lucide-book-open' },
   { id: 'movie', label: 'Film', icon: 'i-lucide-clapperboard' },
-  { id: 'anime', label: 'Anime', icon: 'i-lucide-sparkles' },
-  { id: 'manga', label: 'Manga', icon: 'i-lucide-book-marked' },
-  { id: 'game', label: 'Videogiochi', icon: 'i-lucide-gamepad-2' }
+  { id: 'game', label: 'Videogiochi', icon: 'i-lucide-gamepad-2' },
+  { id: 'other', label: 'Altro', icon: 'i-lucide-bookmark' }
 ])
 
 const statusTabs = computed(() => [

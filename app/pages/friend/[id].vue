@@ -94,8 +94,8 @@ function openDetail(item: MediaItem) {
           { id: 'series', label: 'Serie TV' },
           { id: 'book', label: 'Libri' },
           { id: 'movie', label: 'Film' },
-          { id: 'anime', label: 'Anime' },
-          { id: 'manga', label: 'Manga' }
+          { id: 'game', label: 'Videogiochi' },
+          { id: 'other', label: 'Altro' }
         ]"
         :key="t.id"
         type="button"

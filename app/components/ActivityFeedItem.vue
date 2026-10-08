@@ -36,16 +36,22 @@ const actionIcon = computed(() => {
 <template>
   <div class="surface-card flex items-start gap-3.5 rounded-2xl p-4 border transition duration-150 hover:border-indigo-500/30 dark:border-slate-800">
     <!-- User Avatar -->
-    <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm">
+    <NuxtLink
+      :to="`/friend/${activity.user_id}`"
+      class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-sm font-bold text-white shadow-sm transition hover:opacity-90"
+    >
       {{ avatarInitial }}
-    </div>
+    </NuxtLink>
 
     <!-- Content -->
     <div class="min-w-0 flex-1">
       <div class="flex items-center justify-between gap-2">
-        <p class="truncate text-xs font-bold text-slate-900 dark:text-white">
+        <NuxtLink
+          :to="`/friend/${activity.user_id}`"
+          class="truncate text-xs font-bold text-slate-900 dark:text-white hover:underline"
+        >
           {{ activity.profile?.display_name || activity.profile?.username || 'Un amico' }}
-        </p>
+        </NuxtLink>
         <span class="text-[11px] text-slate-400 whitespace-nowrap">{{ timeDisplay }}</span>
       </div>
 

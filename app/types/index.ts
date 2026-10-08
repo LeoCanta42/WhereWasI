@@ -1,4 +1,4 @@
-export type MediaType = 'series' | 'book' | 'movie' | 'game' | 'other'
+export type MediaType = 'series' | 'book' | 'movie' | 'game' | 'podcast' | 'other'
 
 export type MediaStatus = 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
 

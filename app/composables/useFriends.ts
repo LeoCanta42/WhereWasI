@@ -254,7 +254,7 @@ export function useFriends() {
         .from('media_items')
         .select('*')
         .eq('user_id', friendUserId)
-        .eq('is_private', false)
+        .neq('is_private', true)
         .order('updated_at', { ascending: false })
 
       if (error) {

@@ -15,15 +15,20 @@ const {
   pendingCount,
   loadUsers,
   setApproved,
-  setAdminRole,
   resetPassword,
   deleteUser,
   isSelf
 } = useAdmin()
 
-const { refreshProfile } = useProfile()
+const { refreshProfile, isAdmin, loaded: profileLoaded } = useProfile()
 const { ask } = useConfirm()
 const toast = useToast()
+
+watch([isAdmin, profileLoaded], ([admin, loaded]) => {
+  if (loaded && !admin) {
+    navigateTo('/')
+  }
+}, { immediate: true })
 
 type Filter = 'all' | 'pending' | 'admins'
 
@@ -144,32 +149,6 @@ async function toggleApproved(user: AdminUser) {
   }
 
   await setApproved(user, !user.approved)
-}
-
-async function toggleAdmin(user: AdminUser) {
-  if (isSelf(user) && user.is_admin) {
-    toast.add({
-      title: 'Azione non consentita',
-      description: 'Non puoi revocare i diritti di amministratore a te stesso.',
-      color: 'warning'
-    })
-    return
-  }
-
-  const confirmed = await ask({
-    title: user.is_admin
-      ? `Revocare i privilegi di admin a ${user.display_name || user.username}?`
-      : `Promuovere ${user.display_name || user.username} ad Amministratore?`,
-    description: user.is_admin
-      ? 'Non potrà più gestire utenti o approvare account.'
-      : 'Potrà approvare account, cambiare password e gestire tutti gli utenti.',
-    confirmLabel: user.is_admin ? 'Revoca Admin' : 'Rendi Admin',
-    tone: user.is_admin ? 'danger' : 'primary',
-    icon: 'i-lucide-shield-alert'
-  })
-  if (!confirmed) return
-
-  await setAdminRole(user, !user.is_admin)
 }
 
 async function removeUser(user: AdminUser) {
@@ -363,18 +342,6 @@ async function removeUser(user: AdminUser) {
                     @click="togglePasswordPanel(u)"
                   >
                     <UIcon name="i-lucide-key-round" class="h-4 w-4" />
-                  </button>
-
-                  <!-- Admin Toggle -->
-                  <button
-                    v-if="!isSelf(u)"
-                    type="button"
-                    class="flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 hover:bg-slate-100 dark:border-slate-800 dark:hover:bg-slate-800"
-                    :class="u.is_admin ? 'text-purple-600 dark:text-purple-400' : 'text-slate-400'"
-                    :title="u.is_admin ? 'Revoca ruolo admin' : 'Rendi amministratore'"
-                    @click="toggleAdmin(u)"
-                  >
-                    <UIcon name="i-lucide-shield" class="h-4 w-4" />
                   </button>
 
                   <!-- Delete Button -->

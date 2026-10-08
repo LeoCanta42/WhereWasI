@@ -28,6 +28,7 @@ const typeTabs = computed(() => [
   { id: 'book', label: 'Libri', icon: 'i-lucide-book-open' },
   { id: 'movie', label: 'Film', icon: 'i-lucide-clapperboard' },
   { id: 'game', label: 'Videogiochi', icon: 'i-lucide-gamepad-2' },
+  { id: 'podcast', label: 'Podcast', icon: 'i-lucide-mic' },
   { id: 'other', label: 'Altro', icon: 'i-lucide-bookmark' }
 ])
 

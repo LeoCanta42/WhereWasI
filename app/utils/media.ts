@@ -13,6 +13,7 @@ export const MEDIA_TYPES: MediaTypeOption[] = [
   { id: 'book', label: 'Libro', icon: 'i-lucide-book-open', color: 'emerald', unitDefault: 'Pagina' },
   { id: 'movie', label: 'Film', icon: 'i-lucide-clapperboard', color: 'amber', unitDefault: 'Visione' },
   { id: 'game', label: 'Videogioco', icon: 'i-lucide-gamepad-2', color: 'cyan', unitDefault: 'Progresso' },
+  { id: 'podcast', label: 'Podcast', icon: 'i-lucide-mic', color: 'teal', unitDefault: 'Puntata' },
   { id: 'other', label: 'Altro', icon: 'i-lucide-bookmark', color: 'slate', unitDefault: 'Avanzamento' }
 ]
 
@@ -276,6 +277,11 @@ export function getMediaGradient(type: MediaType, id: number | string = 1): stri
       'from-cyan-600 to-blue-800',
       'from-sky-500 to-indigo-700',
       'from-teal-500 to-blue-900'
+    ],
+    podcast: [
+      'from-teal-600 to-emerald-800',
+      'from-cyan-700 to-teal-950',
+      'from-blue-600 to-teal-800'
     ],
     other: [
       'from-slate-600 to-zinc-800',

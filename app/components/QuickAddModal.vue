@@ -172,7 +172,7 @@ function handleAdd() {
       <!-- Media Type Selection -->
       <div class="space-y-1.5">
         <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Cosa vuoi tracciare?</label>
-        <div class="grid grid-cols-3 sm:grid-cols-5 gap-2">
+        <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
           <button
             v-for="t in MEDIA_TYPES"
             :key="t.id"

@@ -19,9 +19,19 @@ useSeoMeta({
 const { user } = useAuth()
 const { loadItems, items, addItem } = useMediaTracker()
 const { loadFriends, friends, pendingIncoming } = useFriends()
-const { status: approvalStatus, isApproved, loadProfile, resetProfile } = useProfile()
+const { status: approvalStatus, isApproved, isAdmin, loaded: profileLoaded, loadProfile, resetProfile } = useProfile()
 const { needRefresh, offlineReady, updateApp } = usePwa()
 const { openQuickAdd, isQuickAddOpen, quickAddInitialType } = useQuickAdd()
+const route = useRoute()
+
+// Route protection watcher (e.g. if user is on /admin and logs out or switches to non-admin)
+watch([user, isAdmin, profileLoaded, () => route.path], ([currentUser, admin, loaded, path]) => {
+  if (path === '/admin') {
+    if (!currentUser || (loaded && !admin)) {
+      navigateTo('/')
+    }
+  }
+})
 
 // Projects theme & accent onto <html>
 useAppearance()

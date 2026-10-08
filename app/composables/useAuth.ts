@@ -156,6 +156,7 @@ export function useAuth() {
   async function logout(): Promise<void> {
     try {
       await supabase.auth.signOut()
+      await navigateTo('/')
       toast.add({
         title: 'Disconnesso',
         description: 'A presto!',

@@ -86,7 +86,7 @@ export interface Database {
           id: number
           user_id: string
           title: string
-          media_type: 'series' | 'book' | 'movie' | 'game' | 'other'
+          media_type: 'series' | 'book' | 'movie' | 'game' | 'podcast' | 'other'
           status: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
           progress_type: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
           season: number | null
@@ -117,7 +117,7 @@ export interface Database {
           id?: number
           user_id?: string
           title: string
-          media_type?: 'series' | 'book' | 'movie' | 'game' | 'other'
+          media_type?: 'series' | 'book' | 'movie' | 'game' | 'podcast' | 'other'
           status?: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
           progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
           season?: number | null
@@ -148,7 +148,7 @@ export interface Database {
           id?: number
           user_id?: string
           title?: string
-          media_type?: 'series' | 'book' | 'movie' | 'game' | 'other'
+          media_type?: 'series' | 'book' | 'movie' | 'game' | 'podcast' | 'other'
           status?: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
           progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'time' | 'custom'
           season?: number | null

@@ -1,5 +1,5 @@
 import type { Database } from '~/types/database.types'
-import type { Profile } from '~/types'
+import type { ApprovalStatus, Profile } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
 
 export function useProfile() {
@@ -12,7 +12,14 @@ export function useProfile() {
   const loaded = useState<boolean>('my-profile-loaded', () => false)
 
   const isAdmin = computed(() => Boolean(profile.value?.is_admin))
-  const isApproved = computed(() => profile.value ? profile.value.approved : true)
+
+  const status = computed<ApprovalStatus>(() => {
+    if (!loaded.value) return 'unknown'
+    if (!profile.value) return 'pending'
+    return profile.value.approved ? 'approved' : 'pending'
+  })
+
+  const isApproved = computed(() => status.value === 'approved')
 
   async function loadProfile() {
     const id = userId.value
@@ -35,14 +42,14 @@ export function useProfile() {
       } else if (data) {
         profile.value = data as Profile
       } else {
-        // Fallback: create default profile row if trigger hasn't run yet
+        // Create initial profile row waiting for approval
         const defaultProfile: Partial<Profile> = {
           id,
           email: userEmail.value,
           username: userEmail.value ? userEmail.value.split('@')[0] : 'user',
           display_name: userEmail.value ? userEmail.value.split('@')[0] : 'User',
           bio: '',
-          approved: true,
+          approved: false,
           is_admin: false
         }
         const { data: inserted } = await supabase.from('profiles').insert(defaultProfile as any).select().single()
@@ -93,6 +100,10 @@ export function useProfile() {
     }
   }
 
+  async function refreshProfile(): Promise<void> {
+    await loadProfile()
+  }
+
   function resetProfile() {
     profile.value = null
     loaded.value = false
@@ -104,7 +115,9 @@ export function useProfile() {
     loaded,
     isAdmin,
     isApproved,
+    status,
     loadProfile,
+    refreshProfile,
     updateProfile,
     resetProfile
   }

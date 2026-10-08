@@ -1,11 +1,17 @@
 -- ==============================================================================
--- WhereWasI? - Database Schema with Authentication, Social Friendships & RLS
+-- WhereWasI? - Database Schema with Authentication, Social Friendships, RLS & Admin
 --
 -- WHERE TO RUN
---   Supabase Dashboard -> SQL Editor (or Supabase CLI)
+--   Supabase Dashboard -> SQL Editor
 --
--- IDEMPOTENT & SAFE TO RE-RUN
---   Every statement uses IF NOT EXISTS / OR REPLACE / DROP ... IF EXISTS.
+-- THIS FILE IS IDEMPOTENT AND IS ALSO THE MIGRATION
+--   Every statement is guarded (IF NOT EXISTS / OR REPLACE / DROP ... IF EXISTS),
+--   so re-running the whole file on an existing database is safe.
+--
+-- GRANTING YOURSELF ADMIN (run separately, after this file):
+--   UPDATE public.profiles
+--   SET is_admin = true, approved = true
+--   WHERE LOWER(email) = LOWER('you@example.com');
 -- ==============================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
@@ -20,10 +26,12 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   display_name TEXT,
   avatar_url TEXT,
   bio TEXT DEFAULT '',
-  approved BOOLEAN NOT NULL DEFAULT TRUE,
+  approved BOOLEAN NOT NULL DEFAULT FALSE,
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  approved_at TIMESTAMPTZ,
+  approved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
@@ -31,12 +39,15 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS username TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS display_name TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
-ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES auth.users(id) ON DELETE SET NULL;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_username ON public.profiles(LOWER(username)) WHERE username IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(LOWER(email));
+CREATE INDEX IF NOT EXISTS idx_profiles_pending ON public.profiles(approved) WHERE approved = FALSE;
 
 -- ==============================================================================
 -- 2. FRIENDSHIPS
@@ -61,25 +72,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_friendships_unique_pair
 CREATE INDEX IF NOT EXISTS idx_friendships_requester ON public.friendships(requester_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON public.friendships(addressee_id);
 CREATE INDEX IF NOT EXISTS idx_friendships_status ON public.friendships(status);
-
--- Helper function: Check if two users are confirmed friends
-CREATE OR REPLACE FUNCTION public.are_friends(u1 UUID, u2 UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.friendships
-    WHERE status = 'accepted'
-      AND (
-        (requester_id = u1 AND addressee_id = u2)
-        OR
-        (requester_id = u2 AND addressee_id = u1)
-      )
-  );
-$$;
 
 -- ==============================================================================
 -- 3. MEDIA ITEMS (Series, Books, Movies, Anime, Manga, etc.)
@@ -159,7 +151,7 @@ CREATE TABLE IF NOT EXISTS public.media_activities (
   media_item_id BIGINT REFERENCES public.media_items(id) ON DELETE CASCADE,
   media_title TEXT NOT NULL,
   media_type TEXT NOT NULL,
-  action_type TEXT NOT NULL, -- 'started', 'progress_updated', 'completed', 'rated', 'status_changed'
+  action_type TEXT NOT NULL,
   progress_text TEXT,
   message TEXT,
   is_private BOOLEAN NOT NULL DEFAULT FALSE,
@@ -174,7 +166,37 @@ CREATE INDEX IF NOT EXISTS idx_activities_user ON public.media_activities(user_i
 CREATE INDEX IF NOT EXISTS idx_activities_created ON public.media_activities(created_at DESC);
 
 -- ==============================================================================
--- 5. AUTOMATIC TRIGGERS (Updated at & Profile sync)
+-- 5. ACCESS CHECK FUNCTIONS
+-- ==============================================================================
+
+CREATE OR REPLACE FUNCTION public.is_admin(uid UUID)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE((SELECT p.is_admin FROM public.profiles p WHERE p.id = uid), FALSE);
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_approved(uid UUID)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT COALESCE((SELECT p.approved FROM public.profiles p WHERE p.id = uid), FALSE);
+$$;
+
+CREATE OR REPLACE FUNCTION public.are_friends(u1 UUID, u2 UUID)
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.friendships
+    WHERE status = 'accepted'
+      AND (
+        (requester_id = u1 AND addressee_id = u2)
+        OR
+        (requester_id = u2 AND addressee_id = u1)
+      )
+  );
+$$;
+
+-- ==============================================================================
+-- 6. AUTOMATIC TRIGGERS
 -- ==============================================================================
 
 CREATE OR REPLACE FUNCTION public.touch_updated_at()
@@ -200,7 +222,7 @@ CREATE TRIGGER on_friendships_updated
   BEFORE UPDATE ON public.friendships
   FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at();
 
--- Trigger to automatically create profile on signup
+-- Trigger to automatically create profile on signup (starts un-approved)
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -219,11 +241,11 @@ BEGIN
   INSERT INTO public.profiles (id, email, username, display_name, avatar_url, approved, is_admin)
   VALUES (
     NEW.id,
-    NEW.email,
+    LOWER(NEW.email),
     extracted_username,
     extracted_display,
     NEW.raw_user_meta_data->>'avatar_url',
-    TRUE,
+    FALSE,
     FALSE
   )
   ON CONFLICT (id) DO UPDATE
@@ -234,15 +256,38 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
+-- Keep email in step
+CREATE OR REPLACE FUNCTION public.handle_user_email_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE public.profiles SET email = LOWER(NEW.email) WHERE id = NEW.id;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_auth_user_email_changed ON auth.users;
+CREATE TRIGGER on_auth_user_email_changed
+  AFTER UPDATE OF email ON auth.users
+  FOR EACH ROW
+  WHEN (OLD.email IS DISTINCT FROM NEW.email)
+  EXECUTE FUNCTION public.handle_user_email_change();
+
+-- Backfill profiles for existing users
+INSERT INTO public.profiles (id, email, approved, approved_at)
+SELECT u.id, LOWER(u.email), TRUE, NOW()
+FROM auth.users u
+ON CONFLICT (id) DO NOTHING;
+
 -- ==============================================================================
--- 6. ROW LEVEL SECURITY (RLS)
+-- 7. ROW LEVEL SECURITY (RLS)
 -- ==============================================================================
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
@@ -250,7 +295,7 @@ ALTER TABLE public.friendships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.media_activities ENABLE ROW LEVEL SECURITY;
 
--- 6.1 Profiles Policies
+-- 7.1 Profiles Policies
 DROP POLICY IF EXISTS "Anyone authenticated can view profiles" ON public.profiles;
 CREATE POLICY "Anyone authenticated can view profiles"
   ON public.profiles FOR SELECT
@@ -264,90 +309,262 @@ CREATE POLICY "Users can update their own profile"
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- 6.2 Friendships Policies
+-- 7.2 Friendships Policies
 DROP POLICY IF EXISTS "Users can view their friendships" ON public.friendships;
 CREATE POLICY "Users can view their friendships"
   ON public.friendships FOR SELECT
   TO authenticated
-  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+  USING (
+    public.is_approved(auth.uid())
+    AND (auth.uid() = requester_id OR auth.uid() = addressee_id)
+  );
 
 DROP POLICY IF EXISTS "Users can create friend requests" ON public.friendships;
 CREATE POLICY "Users can create friend requests"
   ON public.friendships FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = requester_id);
+  WITH CHECK (
+    public.is_approved(auth.uid())
+    AND auth.uid() = requester_id
+  );
 
 DROP POLICY IF EXISTS "Users can update their friendships" ON public.friendships;
 CREATE POLICY "Users can update their friendships"
   ON public.friendships FOR UPDATE
   TO authenticated
-  USING (auth.uid() = requester_id OR auth.uid() = addressee_id)
-  WITH CHECK (auth.uid() = requester_id OR auth.uid() = addressee_id);
+  USING (
+    public.is_approved(auth.uid())
+    AND (auth.uid() = requester_id OR auth.uid() = addressee_id)
+  )
+  WITH CHECK (
+    public.is_approved(auth.uid())
+    AND (auth.uid() = requester_id OR auth.uid() = addressee_id)
+  );
 
 DROP POLICY IF EXISTS "Users can delete their friendships" ON public.friendships;
 CREATE POLICY "Users can delete their friendships"
   ON public.friendships FOR DELETE
   TO authenticated
-  USING (auth.uid() = requester_id OR auth.uid() = addressee_id);
+  USING (
+    public.is_approved(auth.uid())
+    AND (auth.uid() = requester_id OR auth.uid() = addressee_id)
+  );
 
--- 6.3 Media Items Policies
+-- 7.3 Media Items Policies
 DROP POLICY IF EXISTS "Users can view own items and friends non-private items" ON public.media_items;
 CREATE POLICY "Users can view own items and friends non-private items"
   ON public.media_items FOR SELECT
   TO authenticated
   USING (
-    auth.uid() = user_id
-    OR
-    (NOT is_private AND public.are_friends(auth.uid(), user_id))
+    public.is_approved(auth.uid())
+    AND (
+      auth.uid() = user_id
+      OR (NOT is_private AND public.are_friends(auth.uid(), user_id))
+    )
   );
 
 DROP POLICY IF EXISTS "Users can insert their own items" ON public.media_items;
 CREATE POLICY "Users can insert their own items"
   ON public.media_items FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    public.is_approved(auth.uid())
+    AND auth.uid() = user_id
+  );
 
 DROP POLICY IF EXISTS "Users can update their own items" ON public.media_items;
 CREATE POLICY "Users can update their own items"
   ON public.media_items FOR UPDATE
   TO authenticated
-  USING (auth.uid() = user_id)
-  WITH CHECK (auth.uid() = user_id);
+  USING (
+    public.is_approved(auth.uid())
+    AND auth.uid() = user_id
+  )
+  WITH CHECK (
+    public.is_approved(auth.uid())
+    AND auth.uid() = user_id
+  );
 
 DROP POLICY IF EXISTS "Users can delete their own items" ON public.media_items;
 CREATE POLICY "Users can delete their own items"
   ON public.media_items FOR DELETE
   TO authenticated
-  USING (auth.uid() = user_id);
+  USING (
+    public.is_approved(auth.uid())
+    AND auth.uid() = user_id
+  );
 
--- 6.4 Activities Policies
+-- 7.4 Activities Policies
 DROP POLICY IF EXISTS "Users can view own and friends activities" ON public.media_activities;
 CREATE POLICY "Users can view own and friends activities"
   ON public.media_activities FOR SELECT
   TO authenticated
   USING (
-    auth.uid() = user_id
-    OR
-    (NOT is_private AND public.are_friends(auth.uid(), user_id))
+    public.is_approved(auth.uid())
+    AND (
+      auth.uid() = user_id
+      OR (NOT is_private AND public.are_friends(auth.uid(), user_id))
+    )
   );
 
 DROP POLICY IF EXISTS "Users can insert own activities" ON public.media_activities;
 CREATE POLICY "Users can insert own activities"
   ON public.media_activities FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    public.is_approved(auth.uid())
+    AND auth.uid() = user_id
+  );
 
 -- ==============================================================================
--- 7. RPC HELPER FUNCTIONS
+-- 8. ADMIN RPC FUNCTIONS
 -- ==============================================================================
 
--- Search user by email or username to send friend request
+-- 8.1 List all users with stats
+DROP FUNCTION IF EXISTS public.admin_list_users();
+CREATE OR REPLACE FUNCTION public.admin_list_users()
+RETURNS TABLE (
+  id UUID,
+  email TEXT,
+  username TEXT,
+  display_name TEXT,
+  approved BOOLEAN,
+  is_admin BOOLEAN,
+  created_at TIMESTAMPTZ,
+  last_sign_in_at TIMESTAMPTZ,
+  approved_at TIMESTAMPTZ,
+  media_count BIGINT,
+  friend_count BIGINT
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'admin_list_users: not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    u.id,
+    u.email::TEXT,
+    p.username,
+    p.display_name,
+    COALESCE(p.approved, FALSE),
+    COALESCE(p.is_admin, FALSE),
+    u.created_at,
+    u.last_sign_in_at,
+    p.approved_at,
+    (SELECT COUNT(*) FROM public.media_items m WHERE m.user_id = u.id),
+    (SELECT COUNT(*) FROM public.friendships f
+      WHERE (f.requester_id = u.id OR f.addressee_id = u.id) AND f.status = 'accepted')
+  FROM auth.users u
+  LEFT JOIN public.profiles p ON p.id = u.id
+  ORDER BY COALESCE(p.approved, FALSE) ASC, u.created_at DESC;
+END;
+$$;
+
+-- 8.2 Approve or revoke user
+DROP FUNCTION IF EXISTS public.admin_set_approved(UUID, BOOLEAN);
+CREATE OR REPLACE FUNCTION public.admin_set_approved(p_user_id UUID, p_approved BOOLEAN)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'admin_set_approved: not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  INSERT INTO public.profiles (id, email, approved, approved_at, approved_by)
+  SELECT u.id, LOWER(u.email), p_approved,
+         CASE WHEN p_approved THEN NOW() END,
+         CASE WHEN p_approved THEN auth.uid() END
+  FROM auth.users u WHERE u.id = p_user_id
+  ON CONFLICT (id) DO UPDATE
+    SET approved = EXCLUDED.approved,
+        approved_at = EXCLUDED.approved_at,
+        approved_by = EXCLUDED.approved_by;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'admin_set_approved: no user with id %', p_user_id;
+  END IF;
+END;
+$$;
+
+-- 8.3 Grant or revoke admin role
+DROP FUNCTION IF EXISTS public.admin_set_admin(UUID, BOOLEAN);
+CREATE OR REPLACE FUNCTION public.admin_set_admin(p_user_id UUID, p_is_admin BOOLEAN)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'admin_set_admin: not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_user_id = auth.uid() AND NOT p_is_admin THEN
+    RAISE EXCEPTION 'admin_set_admin: you cannot revoke your own admin rights';
+  END IF;
+
+  UPDATE public.profiles SET is_admin = p_is_admin WHERE id = p_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'admin_set_admin: no profile for user %', p_user_id;
+  END IF;
+END;
+$$;
+
+-- 8.4 Set password directly
+DROP FUNCTION IF EXISTS public.admin_set_password(UUID, TEXT);
+CREATE OR REPLACE FUNCTION public.admin_set_password(p_user_id UUID, p_password TEXT)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'admin_set_password: not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_password IS NULL OR length(p_password) < 6 THEN
+    RAISE EXCEPTION 'admin_set_password: password must be at least 6 characters';
+  END IF;
+
+  UPDATE auth.users
+  SET encrypted_password = crypt(p_password, gen_salt('bf')),
+      updated_at = NOW()
+  WHERE id = p_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'admin_set_password: no user with id %', p_user_id;
+  END IF;
+END;
+$$;
+
+-- 8.5 Delete user
+DROP FUNCTION IF EXISTS public.admin_delete_user(UUID);
+CREATE OR REPLACE FUNCTION public.admin_delete_user(p_user_id UUID)
+RETURNS VOID
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public.is_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'admin_delete_user: not authorized' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'admin_delete_user: you cannot delete your own account';
+  END IF;
+
+  DELETE FROM public.friendships WHERE requester_id = p_user_id OR addressee_id = p_user_id;
+  DELETE FROM public.media_activities WHERE user_id = p_user_id;
+  DELETE FROM public.media_items WHERE user_id = p_user_id;
+  DELETE FROM public.profiles WHERE id = p_user_id;
+  DELETE FROM auth.users WHERE id = p_user_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'admin_delete_user: no user with id %', p_user_id;
+  END IF;
+END;
+$$;
+
+-- 8.6 Send friend request RPC
 CREATE OR REPLACE FUNCTION public.send_friend_request_by_identifier(identifier TEXT)
 RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   target_user RECORD;
   current_user_id UUID := auth.uid();
@@ -356,6 +573,10 @@ DECLARE
 BEGIN
   IF current_user_id IS NULL THEN
     RETURN jsonb_build_object('success', false, 'error', 'Non autenticato');
+  END IF;
+
+  IF NOT public.is_approved(current_user_id) THEN
+    RETURN jsonb_build_object('success', false, 'error', 'Account in attesa di approvazione');
   END IF;
 
   identifier := LOWER(TRIM(identifier));

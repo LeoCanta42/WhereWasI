@@ -16,10 +16,10 @@ useSeoMeta({
   ogType: 'website'
 })
 
-const { user, logout } = useAuth()
+const { user } = useAuth()
 const { loadItems, items } = useMediaTracker()
 const { loadFriends, friends, pendingIncoming } = useFriends()
-const { loadProfile, resetProfile } = useProfile()
+const { status: approvalStatus, isApproved, loadProfile, resetProfile } = useProfile()
 const { needRefresh, offlineReady, updateApp } = usePwa()
 const { openQuickAdd } = useQuickAdd()
 
@@ -65,10 +65,13 @@ watch(user, async (currentUser) => {
   }
 
   await loadProfile()
-  await Promise.all([
-    loadItems(),
-    loadFriends()
-  ])
+
+  if (isApproved.value) {
+    await Promise.all([
+      loadItems(),
+      loadFriends()
+    ])
+  }
 }, { immediate: true })
 </script>
 
@@ -91,7 +94,12 @@ watch(user, async (currentUser) => {
           <AuthView />
         </div>
 
-        <!-- Authenticated: Routed Pages -->
+        <!-- Signed in but pending approval -->
+        <div v-else-if="approvalStatus !== 'approved'" class="mx-auto max-w-3xl px-4 sm:px-6">
+          <AccountStatus :status="approvalStatus" />
+        </div>
+
+        <!-- Authenticated and approved: Routed Pages -->
         <NuxtPage v-else />
       </main>
 
@@ -100,7 +108,7 @@ watch(user, async (currentUser) => {
       <AppConfirmDialog />
 
       <!-- Mobile Floating Action Button -->
-      <AppFab v-if="user" @activate="openQuickAdd()" />
+      <AppFab v-if="user && isApproved" @activate="openQuickAdd()" />
     </div>
   </UApp>
 </template>

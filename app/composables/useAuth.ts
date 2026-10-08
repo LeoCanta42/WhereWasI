@@ -71,13 +71,13 @@ export function useAuth() {
       if (data.session) {
         toast.add({
           title: 'Account creato!',
-          description: 'Benvenuto su WhereWasI?!',
-          color: 'success'
+          description: 'Il tuo account è stato creato ed è in attesa di approvazione da parte dell\'amministratore.',
+          color: 'info'
         })
       } else {
         toast.add({
           title: 'Registrazione completata',
-          description: 'Controlla la tua email per confermare la registrazione se richiesto.',
+          description: 'Il tuo account è in attesa di approvazione da parte dell\'amministratore.',
           color: 'info'
         })
       }

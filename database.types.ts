@@ -21,6 +21,8 @@ export interface Database {
           is_admin: boolean
           created_at: string
           updated_at: string
+          approved_at: string | null
+          approved_by: string | null
         }
         Insert: {
           id: string
@@ -33,6 +35,8 @@ export interface Database {
           is_admin?: boolean
           created_at?: string
           updated_at?: string
+          approved_at?: string | null
+          approved_by?: string | null
         }
         Update: {
           id?: string
@@ -45,6 +49,8 @@ export interface Database {
           is_admin?: boolean
           created_at?: string
           updated_at?: string
+          approved_at?: string | null
+          approved_by?: string | null
         }
       }
       friendships: {
@@ -106,7 +112,7 @@ export interface Database {
           id?: number
           user_id?: string
           title: string
-          media_type: 'series' | 'book' | 'movie' | 'anime' | 'manga' | 'game' | 'podcast' | 'other'
+          media_type?: 'series' | 'book' | 'movie' | 'anime' | 'manga' | 'game' | 'podcast' | 'other'
           status?: 'in_progress' | 'completed' | 'planned' | 'on_hold' | 'dropped'
           progress_type?: 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'custom'
           season?: number | null
@@ -211,6 +217,61 @@ export interface Database {
           u2: string
         }
         Returns: boolean
+      }
+      is_admin: {
+        Args: {
+          uid: string
+        }
+        Returns: boolean
+      }
+      is_approved: {
+        Args: {
+          uid: string
+        }
+        Returns: boolean
+      }
+      admin_list_users: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          email: string | null
+          username: string | null
+          display_name: string | null
+          approved: boolean
+          is_admin: boolean
+          created_at: string
+          last_sign_in_at: string | null
+          approved_at: string | null
+          media_count: number
+          friend_count: number
+        }[]
+      }
+      admin_set_approved: {
+        Args: {
+          p_user_id: string
+          p_approved: boolean
+        }
+        Returns: void
+      }
+      admin_set_admin: {
+        Args: {
+          p_user_id: string
+          p_is_admin: boolean
+        }
+        Returns: void
+      }
+      admin_set_password: {
+        Args: {
+          p_user_id: string
+          p_password: string
+        }
+        Returns: void
+      }
+      admin_delete_user: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: void
       }
     }
   }

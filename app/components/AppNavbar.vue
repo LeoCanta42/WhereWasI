@@ -82,6 +82,18 @@ const avatarInitial = computed(() => {
             {{ incomingCount }}
           </span>
         </NuxtLink>
+
+        <NuxtLink
+          v-if="profile?.is_admin"
+          to="/admin"
+          class="flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition"
+          :class="route.path === '/admin'
+            ? 'bg-purple-600 text-white shadow-sm'
+            : 'text-purple-600 hover:bg-purple-50 dark:text-purple-400 dark:hover:bg-purple-950/50'"
+        >
+          <UIcon name="i-lucide-shield" class="h-4 w-4" />
+          <span>Admin</span>
+        </NuxtLink>
       </nav>
 
       <!-- Actions -->

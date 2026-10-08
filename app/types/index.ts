@@ -4,6 +4,8 @@ export type MediaStatus = 'in_progress' | 'completed' | 'planned' | 'on_hold' | 
 
 export type ProgressType = 'episode_season' | 'pages' | 'percentage' | 'chapter' | 'custom'
 
+export type ApprovalStatus = 'unknown' | 'approved' | 'pending'
+
 export interface MediaItem {
   id: number
   user_id: string
@@ -31,7 +33,6 @@ export interface MediaItem {
   completed_at: string | null
   created_at: string
   updated_at: string
-  // Virtual / joined
   profile?: Profile
 }
 
@@ -46,6 +47,22 @@ export interface Profile {
   is_admin: boolean
   created_at: string
   updated_at: string
+  approved_at?: string | null
+  approved_by?: string | null
+}
+
+export interface AdminUser {
+  id: string
+  email: string | null
+  username: string | null
+  display_name: string | null
+  approved: boolean
+  is_admin: boolean
+  created_at: string
+  last_sign_in_at: string | null
+  approved_at: string | null
+  media_count: number
+  friend_count: number
 }
 
 export type FriendshipStatus = 'pending' | 'accepted' | 'declined' | 'blocked'

@@ -39,18 +39,8 @@ const avatarInitial = computed(() => {
   <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/80">
     <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
       <!-- Logo & Brand -->
-      <NuxtLink to="/" class="group flex items-center gap-2.5 transition">
-        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25 transition group-hover:scale-105">
-          <UIcon name="i-lucide-bookmark" class="h-5 w-5" />
-        </div>
-        <div class="flex flex-col">
-          <span class="text-base font-bold tracking-tight text-slate-900 dark:text-white">
-            WhereWas<span class="text-indigo-600 dark:text-indigo-400">I?</span>
-          </span>
-          <span class="text-[10px] font-medium text-slate-400 dark:text-slate-500">
-            Media & Book Tracker
-          </span>
-        </div>
+      <NuxtLink to="/" class="group transition hover:opacity-90">
+        <AppLogo size="md" with-text />
       </NuxtLink>
 
       <!-- Navigation links (when authenticated) -->

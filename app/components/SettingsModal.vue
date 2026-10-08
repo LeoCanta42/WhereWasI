@@ -184,8 +184,8 @@ async function handleChangePassword() {
         </form>
       </div>
 
-      <!-- Logout -->
-      <div class="border-t border-slate-100 pt-4 dark:border-slate-800">
+      <!-- Logout & Info -->
+      <div class="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
         <button
           type="button"
           class="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-50 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-400 dark:hover:bg-rose-900/50"
@@ -194,6 +194,11 @@ async function handleChangePassword() {
           <UIcon name="i-lucide-log-out" class="h-4 w-4" />
           <span>Disconnetti account</span>
         </button>
+
+        <div class="flex items-center justify-between pt-2 px-1">
+          <AppLogo size="xs" with-text />
+          <span class="text-[10px] text-slate-400 font-mono">v1.0.0</span>
+        </div>
       </div>
     </div>
   </AppModal>

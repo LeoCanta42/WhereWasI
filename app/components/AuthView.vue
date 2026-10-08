@@ -70,8 +70,8 @@ async function handleSubmit() {
     <div class="w-full max-w-md">
       <!-- Brand & Welcome -->
       <div class="mb-8 text-center">
-        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-tr from-indigo-600 to-purple-600 text-white shadow-xl shadow-indigo-600/30">
-          <UIcon name="i-lucide-bookmark" class="h-8 w-8" />
+        <div class="mx-auto flex justify-center">
+          <AppLogo size="xl" />
         </div>
         <h1 class="mt-5 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
           WhereWas<span class="text-indigo-600 dark:text-indigo-400">I?</span>

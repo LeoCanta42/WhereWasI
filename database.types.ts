@@ -52,6 +52,7 @@ export interface Database {
           approved_at?: string | null
           approved_by?: string | null
         }
+        Relationships: []
       }
       friendships: {
         Row: {
@@ -78,6 +79,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       media_items: {
         Row: {
@@ -164,6 +166,7 @@ export interface Database {
           created_at?: string
           updated_at?: string
         }
+        Relationships: []
       }
       media_activities: {
         Row: {
@@ -202,8 +205,10 @@ export interface Database {
           is_private?: boolean
           created_at?: string
         }
+        Relationships: []
       }
     }
+    Views: Record<string, never>
     Functions: {
       send_friend_request_by_identifier: {
         Args: {
@@ -231,7 +236,7 @@ export interface Database {
         Returns: boolean
       }
       admin_list_users: {
-        Args: Record<PropertyKey, never>
+        Args: Record<string, never>
         Returns: {
           id: string
           email: string | null
@@ -274,5 +279,7 @@ export interface Database {
         Returns: void
       }
     }
+    Enums: Record<string, never>
+    CompositeTypes: Record<string, never>
   }
 }

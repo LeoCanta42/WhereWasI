@@ -96,7 +96,56 @@ export default defineNuxtConfig({
         { name: 'Le mie Serie', short_name: 'Serie', url: '/?type=series' },
         { name: 'I miei Libri', short_name: 'Libri', url: '/?type=book' },
         { name: 'Attività Amici', short_name: 'Amici', url: '/friends' }
+      ],
+      launch_handler: { client_mode: 'navigate-existing' }
+    },
+    workbox: {
+      globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+      globIgnores: ['**/screenshots/**', '**/splash/**'],
+      navigateFallback: '/',
+      navigateFallbackDenylist: [/^\/api/],
+      cleanupOutdatedCaches: true,
+      runtimeCaching: [
+        {
+          urlPattern: ({ url }) => url.hostname.endsWith('supabase.co'),
+          handler: 'NetworkOnly'
+        },
+        {
+          urlPattern: ({ request }) => request.mode === 'navigate',
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'pages',
+            networkTimeoutSeconds: 5,
+            expiration: {
+              maxEntries: 20,
+              maxAgeSeconds: 60 * 60 * 24
+            }
+          }
+        },
+        {
+          urlPattern: ({ request }) => ['style', 'script', 'worker'].includes(request.destination),
+          handler: 'StaleWhileRevalidate',
+          options: {
+            cacheName: 'assets',
+            expiration: {
+              maxEntries: 80,
+              maxAgeSeconds: 60 * 60 * 24 * 30
+            }
+          }
+        },
+        {
+          urlPattern: ({ request }) => request.destination === 'image',
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'images',
+            expiration: {
+              maxEntries: 60,
+              maxAgeSeconds: 60 * 60 * 24 * 30
+            }
+          }
+        }
       ]
-    }
+    },
+    includeAssets: ['favicon.ico', 'favicon.svg', 'robots.txt', 'icons/*.png']
   }
 })

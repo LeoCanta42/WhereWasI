@@ -19,7 +19,7 @@ const {
 } = useMediaTracker()
 
 const { prefs, update } = usePreferences()
-const { isQuickAddOpen, quickAddInitialType, openQuickAdd } = useQuickAdd()
+const { openQuickAdd } = useQuickAdd()
 
 const activeType = ref<MediaType | 'all'>('all')
 const activeStatus = ref<MediaStatus | 'all'>('in_progress')
@@ -197,13 +197,6 @@ const filteredItems = computed(() => {
       :item="selectedItem"
       @save="updateItem"
       @delete="deleteItem"
-    />
-
-    <!-- Quick Add Modal -->
-    <LazyQuickAddModal
-      v-model:open="isQuickAddOpen"
-      :initial-type="quickAddInitialType"
-      @add="addItem"
     />
   </div>
 </template>

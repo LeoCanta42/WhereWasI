@@ -1,13 +1,21 @@
-import type { JwtPayload } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
 export function useCurrentUser() {
   const user = useSupabaseUser()
 
-  const claims = computed<JwtPayload | null>(() => (user.value as JwtPayload | null) ?? null)
+  const userId = computed<string | null>(() => {
+    const u = user.value as (User & { sub?: string }) | null
+    if (!u) return null
+    return u.id || u.sub || null
+  })
 
-  const userId = computed<string | null>(() => claims.value?.sub ?? null)
+  const userEmail = computed<string | null>(() => {
+    const u = user.value as (User & { email?: string }) | null
+    if (!u) return null
+    return (u.email || (u as any).user_metadata?.email || null)?.toLowerCase() ?? null
+  })
 
-  const userEmail = computed<string | null>(() => claims.value?.email?.toLowerCase() ?? null)
+  const claims = computed(() => (user.value as any) ?? null)
 
   return { user, claims, userId, userEmail }
 }

@@ -3,6 +3,7 @@ import { ACCENTS, usePreferences } from '~/composables/usePreferences'
 import { useAppearance } from '~/composables/useAppearance'
 import { useProfile } from '~/composables/useProfile'
 import { useAuth } from '~/composables/useAuth'
+import { usePwa } from '~/composables/usePwa'
 
 const props = defineProps<{
   open: boolean
@@ -16,6 +17,7 @@ const { prefs, update } = usePreferences()
 const { theme, setTheme, setAccent } = useAppearance()
 const { profile, updateProfile } = useProfile()
 const { changePassword, logout } = useAuth()
+const { canInstall, isInstalled, install, needRefresh, updateApp, manualInstallHint, offlineReady } = usePwa()
 
 const displayName = ref('')
 const username = ref('')
@@ -182,6 +184,78 @@ async function handleChangePassword() {
             {{ isChangingPass ? 'Aggiornamento...' : 'Cambia Password' }}
           </button>
         </form>
+      </div>
+
+      <!-- PWA & Mobile App Section -->
+      <div class="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Applicazione & Mobile</h3>
+          <span
+            v-if="isInstalled"
+            class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+          >
+            <UIcon name="i-lucide-check-circle" class="h-3 w-3" />
+            Installata
+          </span>
+          <span
+            v-else-if="offlineReady"
+            class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300"
+          >
+            <UIcon name="i-lucide-wifi-off" class="h-3 w-3" />
+            Offline Ready
+          </span>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/60">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                <UIcon name="i-lucide-smartphone" class="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-900 dark:text-white">PWA Mobile & Desktop</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  {{ isInstalled ? 'Stai usando l\'app installata.' : 'Installa WhereWasI sulla schermata Home.' }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Install Button -->
+            <button
+              v-if="canInstall && !isInstalled"
+              type="button"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 dark:bg-indigo-500"
+              @click="install"
+            >
+              <UIcon name="i-lucide-download" class="h-3.5 w-3.5" />
+              <span>Installa</span>
+            </button>
+          </div>
+
+          <!-- Manual Hint for iOS Safari or browsers without prompt -->
+          <div
+            v-if="!isInstalled && !canInstall && manualInstallHint"
+            class="rounded-xl bg-white p-2.5 text-[11px] font-medium text-slate-600 border border-slate-200/60 dark:bg-slate-850 dark:border-slate-800 dark:text-slate-300"
+          >
+            <div class="flex items-start gap-1.5">
+              <UIcon name="i-lucide-info" class="h-3.5 w-3.5 text-indigo-500 flex-shrink-0 mt-0.5" />
+              <span>{{ manualInstallHint }}</span>
+            </div>
+          </div>
+
+          <!-- Update Check Button -->
+          <div v-if="needRefresh" class="flex items-center justify-between border-t border-slate-200/60 pt-2 dark:border-slate-800">
+            <span class="text-[11px] font-semibold text-amber-600 dark:text-amber-400">Aggiornamento disponibile!</span>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-lg bg-amber-500 px-2.5 py-1 text-xs font-bold text-white shadow-sm hover:bg-amber-600"
+              @click="updateApp"
+            >
+              <UIcon name="i-lucide-refresh-cw" class="h-3 w-3" />
+              <span>Aggiorna ora</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- Logout & Info -->

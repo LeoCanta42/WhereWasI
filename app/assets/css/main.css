@@ -125,7 +125,9 @@
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  opacity: 0.6;
+  opacity: 0.55;
+  contain: strict;
+  transform: translateZ(0);
   background:
     radial-gradient(ellipse 60% 40% at 20% 0%, var(--accent-100) 0%, transparent 70%),
     radial-gradient(ellipse 60% 40% at 80% 10%, var(--accent-50) 0%, transparent 70%);
@@ -133,34 +135,34 @@
 
 .dark .app-glow {
   opacity: 0.18;
+  contain: strict;
+  transform: translateZ(0);
   background:
     radial-gradient(ellipse 60% 40% at 20% 0%, var(--accent-600) 0%, transparent 70%),
     radial-gradient(ellipse 60% 40% at 80% 10%, var(--accent-alt-600) 0%, transparent 70%);
 }
 
-/* Utility classes */
+/* Utility classes - Fast, crisp, high performance */
 .surface-card {
-  background-color: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  background-color: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
 }
 
 .dark .surface-card {
-  background-color: rgba(15, 23, 42, 0.75);
-  border-color: rgba(51, 65, 85, 0.5);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
+  background-color: rgba(15, 23, 42, 0.85);
+  border-color: rgba(51, 65, 85, 0.55);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.25);
 }
 
 .surface-card-subtle {
-  background-color: rgba(248, 250, 252, 0.7);
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  background-color: rgba(248, 250, 252, 0.85);
+  border: 1px solid rgba(226, 232, 240, 0.7);
 }
 
 .dark .surface-card-subtle {
-  background-color: rgba(30, 41, 59, 0.5);
-  border-color: rgba(51, 65, 85, 0.4);
+  background-color: rgba(30, 41, 59, 0.65);
+  border-color: rgba(51, 65, 85, 0.45);
 }
 
 .text-gradient-accent {
@@ -185,4 +187,24 @@
 
 .dark .gradient-accent-subtle {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+}
+
+/* Safe area insets for mobile & iOS PWA */
+:root {
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+.pb-safe {
+  padding-bottom: calc(1rem + var(--safe-bottom));
+}
+
+.pb-safe-nav {
+  padding-bottom: calc(4.5rem + var(--safe-bottom));
+}
+
+.pt-safe {
+  padding-top: var(--safe-top);
 }

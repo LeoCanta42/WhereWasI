@@ -17,11 +17,11 @@ useSeoMeta({
 })
 
 const { user } = useAuth()
-const { loadItems, items } = useMediaTracker()
+const { loadItems, items, addItem } = useMediaTracker()
 const { loadFriends, friends, pendingIncoming } = useFriends()
 const { status: approvalStatus, isApproved, loadProfile, resetProfile } = useProfile()
 const { needRefresh, offlineReady, updateApp } = usePwa()
-const { openQuickAdd } = useQuickAdd()
+const { openQuickAdd, isQuickAddOpen, quickAddInitialType } = useQuickAdd()
 
 // Projects theme & accent onto <html>
 useAppearance()
@@ -88,7 +88,7 @@ watch(user, async (currentUser) => {
       />
 
       <!-- Main viewport -->
-      <main>
+      <main :class="user && isApproved ? 'pb-safe-nav md:pb-8' : ''">
         <!-- Unauthenticated: Login / Sign up -->
         <div v-if="!user" class="mx-auto max-w-3xl px-4 sm:px-6">
           <AuthView />
@@ -104,11 +104,20 @@ watch(user, async (currentUser) => {
       </main>
 
       <!-- Global Dialogs & Modals -->
+      <LazyQuickAddModal
+        v-if="user && isApproved"
+        v-model:open="isQuickAddOpen"
+        :initial-type="quickAddInitialType"
+        @add="addItem"
+      />
       <LazySettingsModal v-model:open="isSettingsOpen" />
       <AppConfirmDialog />
 
-      <!-- Mobile Floating Action Button -->
-      <AppFab v-if="user && isApproved" @activate="openQuickAdd()" />
+      <!-- Mobile Bottom Navigation Bar -->
+      <MobileBottomNav
+        v-if="user && isApproved"
+        @open-settings="isSettingsOpen = true"
+      />
     </div>
   </UApp>
 </template>

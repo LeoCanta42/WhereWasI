@@ -39,6 +39,11 @@ export function useProfile() {
 
       if (error) {
         console.error('Error loading profile:', error)
+        toast.add({
+          title: 'Errore caricamento profilo',
+          description: error.message,
+          color: 'error'
+        })
       } else if (data) {
         profile.value = data as Profile
       } else {
@@ -52,14 +57,26 @@ export function useProfile() {
           approved: false,
           is_admin: false
         }
-        const { data: inserted } = await supabase.from('profiles').insert(defaultProfile as any).select().single()
-        if (inserted) {
+        const { data: inserted, error: insertError } = await supabase.from('profiles').insert(defaultProfile as any).select().single()
+        if (insertError) {
+          console.error('Error creating default profile:', insertError)
+          toast.add({
+            title: 'Errore creazione profilo',
+            description: insertError.message,
+            color: 'error'
+          })
+        } else if (inserted) {
           profile.value = inserted as Profile
         }
       }
       loaded.value = true
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unexpected error loading profile:', err)
+      toast.add({
+        title: 'Errore imprevisto profilo',
+        description: err?.message || 'Si è verificato un errore durante il caricamento del profilo.',
+        color: 'error'
+      })
       loaded.value = true
     } finally {
       loading.value = false

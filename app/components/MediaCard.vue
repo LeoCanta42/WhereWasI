@@ -53,7 +53,7 @@ const isBookOrManga = computed(() => props.item.media_type === 'book' || props.i
 
       <div class="relative z-10 flex items-start justify-between">
         <!-- Media Type Tag -->
-        <span class="inline-flex items-center gap-1 rounded-lg bg-black/40 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-md">
+        <span class="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white">
           <UIcon :name="typeInfo.icon" class="h-3.5 w-3.5" />
           <span>{{ typeInfo.label }}</span>
         </span>
@@ -62,7 +62,7 @@ const isBookOrManga = computed(() => props.item.media_type === 'book' || props.i
         <div class="flex items-center gap-1.5">
           <span
             v-if="item.is_private"
-            class="flex h-7 w-7 items-center justify-center rounded-lg bg-black/40 text-slate-300 backdrop-blur-md"
+            class="flex h-7 w-7 items-center justify-center rounded-lg bg-black/50 text-slate-200"
             title="Elemento privato (visibile solo a te)"
           >
             <UIcon name="i-lucide-lock" class="h-3.5 w-3.5" />
@@ -71,8 +71,8 @@ const isBookOrManga = computed(() => props.item.media_type === 'book' || props.i
           <button
             v-if="!readonly"
             type="button"
-            class="flex h-7 w-7 items-center justify-center rounded-lg backdrop-blur-md transition"
-            :class="item.is_favorite ? 'bg-amber-400 text-amber-950' : 'bg-black/40 text-white/80 hover:text-white'"
+            class="flex h-7 w-7 items-center justify-center rounded-lg transition active:scale-95"
+            :class="item.is_favorite ? 'bg-amber-400 text-amber-950 shadow-sm' : 'bg-black/50 text-white/90 hover:text-white hover:bg-black/60'"
             :title="item.is_favorite ? 'Rimuovi dai preferiti' : 'Aggiungi ai preferiti'"
             @click.stop="emit('toggle-favorite', item)"
           >

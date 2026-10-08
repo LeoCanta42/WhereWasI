@@ -51,7 +51,7 @@ const statusTabs = computed(() => [
           :value="searchQuery"
           type="text"
           placeholder="Cerca per titolo o genere..."
-          class="w-full rounded-2xl border border-slate-200 bg-white/80 py-2.5 pl-10 pr-9 text-xs sm:text-sm text-slate-900 shadow-sm backdrop-blur-md placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-slate-800 dark:bg-slate-900/80 dark:text-white"
+          class="w-full rounded-2xl border border-slate-200 bg-white py-2.5 pl-10 pr-9 text-xs sm:text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
         />
         <button

@@ -4,6 +4,7 @@ import { useProfile } from '~/composables/useProfile'
 import { useAppearance } from '~/composables/useAppearance'
 import { useFriends } from '~/composables/useFriends'
 import { useQuickAdd } from '~/composables/useQuickAdd'
+import { usePwa } from '~/composables/usePwa'
 
 const props = defineProps<{
   user: any
@@ -20,6 +21,7 @@ const { profile } = useProfile()
 const { theme, setTheme, isDark } = useAppearance()
 const { pendingIncoming, friends } = useFriends()
 const { openQuickAdd } = useQuickAdd()
+const { canInstall, isInstalled, install, needRefresh, updateApp } = usePwa()
 
 const incomingCount = computed(() => pendingIncoming.value.length)
 
@@ -36,7 +38,7 @@ const avatarInitial = computed(() => {
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/80">
+  <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/90 pt-safe backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/90">
     <div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
       <!-- Logo & Brand -->
       <NuxtLink to="/" class="group transition hover:opacity-90">
@@ -88,6 +90,30 @@ const avatarInitial = computed(() => {
 
       <!-- Actions -->
       <div class="flex items-center gap-2">
+        <!-- New PWA Version Available Button -->
+        <button
+          v-if="needRefresh"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-amber-600 active:scale-95 animate-pulse"
+          title="Nuova versione disponibile"
+          @click="updateApp"
+        >
+          <UIcon name="i-lucide-refresh-cw" class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Aggiorna</span>
+        </button>
+
+        <!-- Install PWA Button (when browser supports beforeinstallprompt) -->
+        <button
+          v-if="canInstall && !isInstalled"
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 active:scale-95 dark:border-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+          title="Installa l'app sul dispositivo"
+          @click="install"
+        >
+          <UIcon name="i-lucide-download" class="h-3.5 w-3.5" />
+          <span class="hidden sm:inline">Installa App</span>
+        </button>
+
         <!-- Quick Add Button -->
         <button
           v-if="user"

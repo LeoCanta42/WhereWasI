@@ -105,6 +105,7 @@ async function handleSave() {
   if (!props.item) return
 
   if (isSeries.value) {
+    form.value.progress_type = form.value.progress_type || 'episode_season'
     form.value.season_episodes = Object.keys(seasonEpisodes.value).length > 0 ? seasonEpisodes.value : null
     const curSeason = form.value.season ?? 1
     if (seasonEpisodes.value[String(curSeason)]) {
@@ -138,9 +139,16 @@ async function handleSave() {
       form.value.total_duration = null
     }
   } else if (isBook.value) {
+    form.value.progress_type = form.value.progress_type || 'pages'
     if (form.value.total_pages && (form.value.current_page ?? 0) >= form.value.total_pages && form.value.status === 'in_progress') {
       form.value.status = 'completed'
     }
+  }
+
+  if (form.value.status === 'completed' && !form.value.completed_at) {
+    form.value.completed_at = new Date().toISOString()
+  } else if (form.value.status !== 'completed') {
+    form.value.completed_at = null
   }
 
   emit('save', props.item.id, form.value)

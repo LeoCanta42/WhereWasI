@@ -17,6 +17,10 @@ const title = ref('')
 const genre = ref('')
 const status = ref<MediaStatus>('in_progress')
 
+// Rating & Review
+const rating = ref<number | null>(null)
+const review = ref('')
+
 // Series fields
 const season = ref<number | null>(1)
 const episode = ref<number | null>(1)
@@ -47,6 +51,8 @@ watch(() => props.open, (isOpen) => {
     title.value = ''
     genre.value = ''
     status.value = 'in_progress'
+    rating.value = null
+    review.value = ''
     season.value = 1
     episode.value = 1
     totalSeasons.value = null
@@ -69,6 +75,47 @@ watch(() => props.open, (isOpen) => {
 const isSeries = computed(() => selectedType.value === 'series')
 const isMovie = computed(() => selectedType.value === 'movie')
 const isBook = computed(() => selectedType.value === 'book')
+const isPodcast = computed(() => selectedType.value === 'podcast')
+
+const isCompleted = computed(() => status.value === 'completed')
+const isPlanned = computed(() => status.value === 'planned')
+const isInProgress = computed(() => status.value === 'in_progress' || status.value === 'on_hold' || status.value === 'dropped')
+
+const statusOptions = computed(() => [
+  {
+    id: 'in_progress' as MediaStatus,
+    label: isMovie.value ? 'In Visione' : isBook.value ? 'In Lettura' : 'In Corso',
+    icon: 'i-lucide-play-circle',
+    activeClass: 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950 dark:text-indigo-300'
+  },
+  {
+    id: 'completed' as MediaStatus,
+    label: isMovie.value ? 'Già Visto' : isBook.value ? 'Già Letto' : isSeries.value ? 'Completata' : 'Completato',
+    icon: 'i-lucide-check-circle-2',
+    activeClass: 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-950 dark:text-emerald-300'
+  },
+  {
+    id: 'planned' as MediaStatus,
+    label: isMovie.value ? 'Da Guardare' : isBook.value ? 'Da Leggere' : 'Da Iniziare',
+    icon: 'i-lucide-clock',
+    activeClass: 'border-slate-700 bg-slate-100 text-slate-800 dark:border-slate-400 dark:bg-slate-800 dark:text-slate-200'
+  }
+])
+
+const submitButtonLabel = computed(() => {
+  if (isCompleted.value) {
+    if (isMovie.value) return 'Aggiungi ai Film Visti'
+    if (isBook.value) return 'Aggiungi ai Libri Letti'
+    if (isSeries.value) return 'Aggiungi come Completata'
+    return 'Salva come Completato'
+  }
+  if (isPlanned.value) {
+    if (isMovie.value) return 'Salva in Da Guardare'
+    if (isBook.value) return 'Salva in Da Leggere'
+    return 'Salva in Da Iniziare'
+  }
+  return 'Inizia a Tracciare'
+})
 
 // Auto-expand season breakdown when totalSeasons > 1
 watch(totalSeasons, (val) => {
@@ -101,58 +148,110 @@ function handleAdd() {
   let calculatedTimeStopped: string | null = null
   let calculatedTotalDuration: string | null = null
 
-  if (isSeries.value) {
-    progressType = 'episode_season'
-    const curSeason = season.value ?? 1
-    if (totalEpisodes.value && !seasonEpisodes.value[String(curSeason)]) {
-      seasonEpisodes.value[String(curSeason)] = totalEpisodes.value
-    }
-  } else if (isMovie.value) {
+  if (isMovie.value) {
     progressType = 'time'
-    const totalStopMin = (movieStopHours.value || 0) * 60 + (movieStopMinutes.value || 0)
-    calculatedTimeStopped = totalStopMin > 0 ? formatMinutesToTime(totalStopMin) : '0m'
-
     if (movieDurationHours.value !== null || movieDurationMinutes.value !== null) {
       const totalDurMin = (movieDurationHours.value || 0) * 60 + (movieDurationMinutes.value || 0)
       if (totalDurMin > 0) {
         calculatedTotalDuration = formatMinutesToTime(totalDurMin)
       }
     }
+
+    if (isCompleted.value) {
+      calculatedTimeStopped = calculatedTotalDuration || '0m'
+    } else if (isPlanned.value) {
+      calculatedTimeStopped = '0m'
+    } else {
+      const totalStopMin = (movieStopHours.value || 0) * 60 + (movieStopMinutes.value || 0)
+      calculatedTimeStopped = totalStopMin > 0 ? formatMinutesToTime(totalStopMin) : '0m'
+    }
   } else if (isBook.value) {
     progressType = 'pages'
-  } else if (selectedType.value === 'other' || selectedType.value === 'game') {
+  } else if (isSeries.value || isPodcast.value) {
+    progressType = 'episode_season'
+    const curSeason = season.value ?? 1
+    if (totalEpisodes.value && !seasonEpisodes.value[String(curSeason)]) {
+      seasonEpisodes.value[String(curSeason)] = totalEpisodes.value
+    }
+  } else {
     progressType = 'percentage'
   }
 
   const curSeason = season.value ?? 1
   const effectiveTotalEp = seasonEpisodes.value[String(curSeason)] || totalEpisodes.value || null
 
+  let finalSeason: number | null = null
+  let finalEpisode: number | null = null
+  let finalCurrentPage: number | null = null
+  let finalPercentage: number | null = null
+  let startedAt: string | null = new Date().toISOString()
+  let completedAt: string | null = null
+
+  if (isCompleted.value) {
+    completedAt = new Date().toISOString()
+    if (isSeries.value) {
+      finalSeason = totalSeasons.value || curSeason
+      finalEpisode = effectiveTotalEp || episode.value || 1
+    }
+    if (isBook.value) {
+      finalCurrentPage = totalPages.value || currentPage.value || 1
+    }
+    if (!isSeries.value && !isBook.value && !isMovie.value && !isPodcast.value) {
+      finalPercentage = 100
+    }
+  } else if (isPlanned.value) {
+    startedAt = null
+    completedAt = null
+    if (isSeries.value) {
+      finalSeason = 1
+      finalEpisode = 0
+    }
+    if (isBook.value) {
+      finalCurrentPage = 0
+    }
+    if (!isSeries.value && !isBook.value && !isMovie.value) {
+      finalPercentage = 0
+    }
+  } else {
+    // In progress
+    if (isSeries.value) {
+      finalSeason = curSeason
+      finalEpisode = episode.value ?? 1
+    }
+    if (isBook.value) {
+      finalCurrentPage = currentPage.value ?? 1
+    }
+    if (!isSeries.value && !isBook.value && !isMovie.value) {
+      finalPercentage = percentage.value ?? 0
+    }
+  }
+
   emit('add', {
     title: cleanTitle,
     media_type: selectedType.value,
     status: status.value,
     progress_type: progressType,
-    season: isSeries.value ? curSeason : null,
-    episode: isSeries.value ? (episode.value ?? 1) : null,
+    season: finalSeason,
+    episode: finalEpisode,
     total_seasons: isSeries.value ? totalSeasons.value : null,
     total_episodes: isSeries.value ? effectiveTotalEp : null,
     season_episodes: isSeries.value && Object.keys(seasonEpisodes.value).length > 0 ? seasonEpisodes.value : null,
     time_stopped: isMovie.value ? calculatedTimeStopped : null,
     total_duration: isMovie.value ? calculatedTotalDuration : null,
-    current_page: isBook.value ? (currentPage.value ?? 1) : null,
+    current_page: isBook.value ? finalCurrentPage : null,
     total_pages: isBook.value ? totalPages.value : null,
-    percentage: !isSeries.value && !isBook.value && !isMovie.value ? (percentage.value ?? 0) : null,
+    percentage: finalPercentage,
     current_unit: isMovie.value ? calculatedTimeStopped : (currentUnit.value || null),
-    rating: null,
-    review: '',
+    rating: rating.value,
+    review: review.value.trim(),
     notes: '',
     cover_url: null,
     tags: [],
     genre: genre.value.trim(),
     is_favorite: isFavorite.value,
     is_private: isPrivate.value,
-    started_at: new Date().toISOString(),
-    completed_at: null
+    started_at: startedAt,
+    completed_at: completedAt
   })
 
   emit('update:open', false)
@@ -162,8 +261,8 @@ function handleAdd() {
 <template>
   <AppModal
     :open="open"
-    title="Aggiungi da Tracciare"
-    subtitle="Cosa stai guardando, leggendo o giocando?"
+    title="Aggiungi Opera o Traccia"
+    subtitle="Serie TV, Film, Libri completati, in corso o da iniziare"
     icon="i-lucide-plus"
     size="md"
     @update:open="emit('update:open', $event)"
@@ -171,7 +270,7 @@ function handleAdd() {
     <form class="space-y-4 py-2" @submit.prevent="handleAdd">
       <!-- Media Type Selection -->
       <div class="space-y-1.5">
-        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Cosa vuoi tracciare?</label>
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Categoria</label>
         <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
           <button
             v-for="t in MEDIA_TYPES"
@@ -189,6 +288,26 @@ function handleAdd() {
         </div>
       </div>
 
+      <!-- Status Selection (In corso / Completato / Da Iniziare) -->
+      <div class="space-y-1.5">
+        <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Stato</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button
+            v-for="st in statusOptions"
+            :key="st.id"
+            type="button"
+            class="flex items-center justify-center gap-1.5 rounded-xl border p-2 text-xs font-bold transition"
+            :class="status === st.id
+              ? st.activeClass
+              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400'"
+            @click="status = st.id"
+          >
+            <UIcon :name="st.icon" class="h-4 w-4 flex-shrink-0" />
+            <span class="truncate">{{ st.label }}</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Title & Genre -->
       <div class="space-y-3">
         <div class="space-y-1">
@@ -197,7 +316,7 @@ function handleAdd() {
             v-model="title"
             type="text"
             required
-            placeholder="es. Breaking Bad, Il Signore degli Anelli..."
+            placeholder="es. Breaking Bad, Oppenheimer, Il Signore degli Anelli..."
             class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
@@ -207,14 +326,14 @@ function handleAdd() {
           <input
             v-model="genre"
             type="text"
-            placeholder="es. Fantasy, Dramma, Sci-Fi..."
+            placeholder="es. Sci-Fi, Thriller, Fantasy, Storico..."
             class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
           />
         </div>
       </div>
 
-      <!-- Initial Progress Counter -->
-      <div class="rounded-2xl bg-slate-50/80 p-3.5 border border-slate-100 dark:bg-slate-900/60 dark:border-slate-800">
+      <!-- Progress Section when IN PROGRESS -->
+      <div v-if="isInProgress" class="rounded-2xl bg-slate-50/80 p-3.5 border border-slate-100 dark:bg-slate-900/60 dark:border-slate-800">
         <label class="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">A che punto sei?</label>
         
         <!-- Series: S & Ep & Season episodes -->
@@ -287,7 +406,7 @@ function handleAdd() {
           </div>
         </div>
 
-        <!-- Movie: Time Stopped (instead of percentage) -->
+        <!-- Movie: Time Stopped -->
         <div v-else-if="isMovie" class="space-y-3">
           <div class="space-y-2">
             <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">Punto in cui ti sei fermato (Tempo)</span>
@@ -399,6 +518,155 @@ function handleAdd() {
         </div>
       </div>
 
+      <!-- Optional Target Info when PLANNED -->
+      <div v-else-if="isPlanned" class="rounded-2xl bg-slate-50/80 p-3.5 border border-slate-100 dark:bg-slate-900/60 dark:border-slate-800 space-y-2">
+        <div class="flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-300">
+          <UIcon name="i-lucide-info" class="h-4 w-4 text-slate-500" />
+          <span>Informazioni opera (Opzionali)</span>
+        </div>
+
+        <div v-if="isSeries" class="grid grid-cols-2 gap-2 pt-1">
+          <div class="space-y-1">
+            <span class="text-[11px] font-medium text-slate-500">Totale Stagioni</span>
+            <input
+              v-model.number="totalSeasons"
+              type="number"
+              min="1"
+              placeholder="es. 3"
+              class="w-full rounded-xl border border-slate-200 bg-white p-2 text-sm text-center text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+          <div class="space-y-1">
+            <span class="text-[11px] font-medium text-slate-500">Episodi previsti</span>
+            <input
+              v-model.number="totalEpisodes"
+              type="number"
+              min="1"
+              placeholder="es. 24"
+              class="w-full rounded-xl border border-slate-200 bg-white p-2 text-sm text-center text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div v-else-if="isBook" class="space-y-1 pt-1">
+          <span class="text-[11px] font-medium text-slate-500">Totale Pagine</span>
+          <input
+            v-model.number="totalPages"
+            type="number"
+            min="1"
+            placeholder="es. 350"
+            class="w-full rounded-xl border border-slate-200 bg-white p-2 text-sm text-center text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+          />
+        </div>
+
+        <div v-else-if="isMovie" class="space-y-1 pt-1">
+          <span class="text-[11px] font-medium text-slate-500">Durata Film (Opzionale)</span>
+          <div class="grid grid-cols-2 gap-2">
+            <div class="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900">
+              <input
+                v-model.number="movieDurationHours"
+                type="number"
+                min="0"
+                max="20"
+                placeholder="es. 2"
+                class="w-full bg-transparent text-sm font-bold text-slate-900 focus:outline-none dark:text-white text-center"
+              />
+              <span class="text-xs font-medium text-slate-400 ml-1">ore</span>
+            </div>
+            <div class="flex items-center rounded-xl border border-slate-200 bg-white px-3 py-1.5 dark:border-slate-800 dark:bg-slate-900">
+              <input
+                v-model.number="movieDurationMinutes"
+                type="number"
+                min="0"
+                max="59"
+                placeholder="es. 15"
+                class="w-full bg-transparent text-sm font-bold text-slate-900 focus:outline-none dark:text-white text-center"
+              />
+              <span class="text-xs font-medium text-slate-400 ml-1">min</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rating & Review Section (Visible when COMPLETED or as optional feedback) -->
+      <div class="rounded-2xl bg-slate-50/80 p-3.5 border border-slate-100 dark:bg-slate-900/60 dark:border-slate-800 space-y-3">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">
+            {{ isCompleted ? 'Il tuo Voto e Giudizio' : 'Voto e Note (Opzionali)' }}
+          </label>
+          <span v-if="rating" class="text-xs font-bold text-amber-500 flex items-center gap-1">
+            <UIcon name="i-lucide-star" class="h-3.5 w-3.5 fill-current" />
+            {{ rating }}/10
+          </span>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="space-y-1">
+            <span class="text-[11px] font-medium text-slate-500">Voto (1 - 10)</span>
+            <div class="flex items-center gap-2">
+              <input
+                v-model.number="rating"
+                type="number"
+                min="0"
+                max="10"
+                step="0.5"
+                placeholder="es. 8.5"
+                class="w-full rounded-xl border border-slate-200 bg-white p-2 text-sm text-center text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div v-if="isCompleted && isMovie" class="space-y-1">
+            <span class="text-[11px] font-medium text-slate-500">Durata Film (Opzionale)</span>
+            <div class="grid grid-cols-2 gap-1.5">
+              <div class="flex items-center rounded-xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-slate-900">
+                <input
+                  v-model.number="movieDurationHours"
+                  type="number"
+                  min="0"
+                  max="20"
+                  placeholder="2"
+                  class="w-full bg-transparent text-xs font-bold text-slate-900 focus:outline-none dark:text-white text-center"
+                />
+                <span class="text-[10px] text-slate-400">h</span>
+              </div>
+              <div class="flex items-center rounded-xl border border-slate-200 bg-white px-2 py-1.5 dark:border-slate-800 dark:bg-slate-900">
+                <input
+                  v-model.number="movieDurationMinutes"
+                  type="number"
+                  min="0"
+                  max="59"
+                  placeholder="15"
+                  class="w-full bg-transparent text-xs font-bold text-slate-900 focus:outline-none dark:text-white text-center"
+                />
+                <span class="text-[10px] text-slate-400">m</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="isCompleted && isBook" class="space-y-1">
+            <span class="text-[11px] font-medium text-slate-500">Totale Pagine Lette</span>
+            <input
+              v-model.number="totalPages"
+              type="number"
+              min="1"
+              placeholder="es. 380"
+              class="w-full rounded-xl border border-slate-200 bg-white p-2 text-sm text-center text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+        </div>
+
+        <div class="space-y-1">
+          <span class="text-[11px] font-medium text-slate-500">Recensione o Commento Breve</span>
+          <textarea
+            v-model="review"
+            rows="2"
+            placeholder="Cosa ne pensi? Un pensiero o consiglio per gli amici..."
+            class="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+          />
+        </div>
+      </div>
+
       <!-- Privacy & Favorite Checkboxes -->
       <div class="flex items-center justify-between pt-1">
         <label class="flex items-center gap-2 cursor-pointer">
@@ -416,10 +684,15 @@ function handleAdd() {
         <button
           type="submit"
           :disabled="!title.trim()"
-          class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-600/30 transition hover:bg-indigo-700 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+          class="flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold text-white shadow-lg transition disabled:opacity-50"
+          :class="isCompleted
+            ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30 dark:bg-emerald-500 dark:hover:bg-emerald-600'
+            : isPlanned
+              ? 'bg-slate-800 hover:bg-slate-900 shadow-slate-800/30 dark:bg-slate-700 dark:hover:bg-slate-600'
+              : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/30 dark:bg-indigo-500 dark:hover:bg-indigo-600'"
         >
-          <UIcon name="i-lucide-plus" class="h-4 w-4" />
-          <span>Inizia a Tracciare</span>
+          <UIcon :name="isCompleted ? 'i-lucide-check-circle' : isPlanned ? 'i-lucide-bookmark' : 'i-lucide-plus'" class="h-4 w-4" />
+          <span>{{ submitButtonLabel }}</span>
         </button>
       </div>
     </form>

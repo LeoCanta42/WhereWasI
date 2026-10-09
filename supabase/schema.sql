@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS public.media_items (
   title TEXT NOT NULL,
   media_type TEXT NOT NULL CHECK (media_type IN ('series', 'book', 'movie', 'game', 'podcast', 'other')),
   status TEXT NOT NULL CHECK (status IN ('in_progress', 'completed', 'planned', 'on_hold', 'dropped')) DEFAULT 'in_progress',
-  progress_type TEXT NOT NULL CHECK (progress_type IN ('episode_season', 'pages', 'percentage', 'chapter', 'custom')) DEFAULT 'episode_season',
+  progress_type TEXT NOT NULL CHECK (progress_type IN ('episode_season', 'pages', 'percentage', 'chapter', 'time', 'custom')) DEFAULT 'episode_season',
   
   -- Progress counters
   season INT DEFAULT 1,
@@ -141,6 +141,17 @@ ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS is_private BOOLEAN NOT N
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Ensure progress_type check constraint includes 'time' for existing databases
+DO $$
+BEGIN
+  ALTER TABLE public.media_items DROP CONSTRAINT IF EXISTS media_items_progress_type_check;
+  ALTER TABLE public.media_items DROP CONSTRAINT IF EXISTS media_progress_type_check;
+  ALTER TABLE public.media_items ADD CONSTRAINT media_items_progress_type_check
+    CHECK (progress_type IN ('episode_season', 'pages', 'percentage', 'chapter', 'time', 'custom'));
+EXCEPTION
+  WHEN OTHERS THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_media_user_id ON public.media_items(user_id);
 CREATE INDEX IF NOT EXISTS idx_media_type ON public.media_items(media_type);

@@ -47,10 +47,13 @@ export function useMediaTracker() {
     if (!id) return null
 
     try {
+      const nowIso = new Date().toISOString()
       const row = {
         ...payload,
         user_id: id,
-        updated_at: new Date().toISOString()
+        started_at: payload.started_at ?? (payload.status !== 'planned' ? nowIso : null),
+        completed_at: payload.completed_at ?? (payload.status === 'completed' ? nowIso : null),
+        updated_at: nowIso
       }
 
       const { data, error } = await supabase
@@ -71,15 +74,41 @@ export function useMediaTracker() {
       const newItem = data as unknown as MediaItem
       items.value = [newItem, ...items.value]
 
+      // Determine activity action type & message based on status
+      let actionType: MediaActivity['action_type'] = 'started'
+      let message = `Ha iniziato a seguire "${newItem.title}"`
+
+      if (newItem.status === 'completed') {
+        actionType = 'completed'
+        if (newItem.media_type === 'movie') {
+          message = `Ha visto il film "${newItem.title}"! 🎬`
+        } else if (newItem.media_type === 'book') {
+          message = `Ha finito di leggere "${newItem.title}"! 📚`
+        } else if (newItem.media_type === 'series') {
+          message = `Ha completato la serie "${newItem.title}"! 🍿`
+        } else {
+          message = `Ha completato "${newItem.title}"! 🎉`
+        }
+      } else if (newItem.status === 'planned') {
+        actionType = 'status_changed'
+        if (newItem.media_type === 'movie') {
+          message = `Ha aggiunto "${newItem.title}" ai film da vedere`
+        } else if (newItem.media_type === 'book') {
+          message = `Ha aggiunto "${newItem.title}" ai libri da leggere`
+        } else {
+          message = `Ha aggiunto "${newItem.title}" alla lista da iniziare`
+        }
+      }
+
       // Log activity
       await supabase.from('media_activities').insert({
         user_id: id,
         media_item_id: newItem.id,
         media_title: newItem.title,
         media_type: newItem.media_type,
-        action_type: 'started',
+        action_type: actionType,
         progress_text: formatProgressDisplay(newItem, true),
-        message: `Ha iniziato a seguire "${newItem.title}"`,
+        message,
         is_private: newItem.is_private
       } as any)
 

@@ -40,6 +40,19 @@ function openDetail(item: MediaItem) {
   isDetailOpen.value = true
 }
 
+const categoryCounts = computed(() => {
+  const currentCategoryItems = activeType.value === 'all'
+    ? items.value
+    : items.value.filter((i) => i.media_type === activeType.value)
+
+  return {
+    total: currentCategoryItems.length,
+    inProgress: currentCategoryItems.filter((i) => i.status === 'in_progress').length,
+    completed: currentCategoryItems.filter((i) => i.status === 'completed').length,
+    planned: currentCategoryItems.filter((i) => i.status === 'planned').length
+  }
+})
+
 const filteredItems = computed(() => {
   let list = items.value
 
@@ -59,6 +72,7 @@ const filteredItems = computed(() => {
     list = list.filter((i) =>
       i.title.toLowerCase().includes(q) ||
       (i.genre && i.genre.toLowerCase().includes(q)) ||
+      (i.creator && i.creator.toLowerCase().includes(q)) ||
       (i.tags && i.tags.some((t) => t.toLowerCase().includes(q)))
     )
   }
@@ -69,49 +83,69 @@ const filteredItems = computed(() => {
 
 <template>
   <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
-    <!-- Top Stats Overview Bar -->
+    <!-- Top Stats Overview Bar: Serie Viste, Film Visti, Libri Letti, Totale Opere -->
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      <div class="surface-card rounded-2xl p-4 border border-slate-200/70 dark:border-slate-800">
+      <!-- Serie Viste -->
+      <div
+        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-indigo-500/50 hover:shadow-sm dark:border-slate-800"
+        title="Filtra per Serie TV"
+        @click="activeType = activeType === 'series' ? 'all' : 'series'"
+      >
         <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Serie in corso</span>
+          <span>Serie Viste</span>
           <UIcon name="i-lucide-tv" class="h-4 w-4 text-indigo-500" />
         </div>
         <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.seriesWatching }}</span>
-          <span class="text-xs text-slate-400">{{ stats.seriesCompleted }} completate</span>
+          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.seriesCompleted }}</span>
+          <span class="text-xs text-slate-400">{{ stats.seriesWatching }} in corso</span>
         </div>
       </div>
 
-      <div class="surface-card rounded-2xl p-4 border border-slate-200/70 dark:border-slate-800">
+      <!-- Film Visti -->
+      <div
+        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-amber-500/50 hover:shadow-sm dark:border-slate-800"
+        title="Filtra per Film"
+        @click="activeType = activeType === 'movie' ? 'all' : 'movie'"
+      >
         <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Libri in lettura</span>
+          <span>Film Visti</span>
+          <UIcon name="i-lucide-clapperboard" class="h-4 w-4 text-amber-500" />
+        </div>
+        <div class="mt-2 flex items-baseline gap-2">
+          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.moviesWatched }}</span>
+          <span class="text-xs text-slate-400">{{ stats.moviesPlanned }} da vedere</span>
+        </div>
+      </div>
+
+      <!-- Libri Letti -->
+      <div
+        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-emerald-500/50 hover:shadow-sm dark:border-slate-800"
+        title="Filtra per Libri"
+        @click="activeType = activeType === 'book' ? 'all' : 'book'"
+      >
+        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span>Libri Letti</span>
           <UIcon name="i-lucide-book-open" class="h-4 w-4 text-emerald-500" />
         </div>
         <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.booksReading }}</span>
-          <span class="text-xs text-slate-400">{{ stats.booksCompleted }} letti</span>
+          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.booksCompleted }}</span>
+          <span class="text-xs text-slate-400">{{ stats.booksReading }} in lettura</span>
         </div>
       </div>
 
-      <div class="surface-card rounded-2xl p-4 border border-slate-200/70 dark:border-slate-800">
+      <!-- Totale Completati -->
+      <div
+        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-purple-500/50 hover:shadow-sm dark:border-slate-800"
+        title="Mostra tutti gli elementi"
+        @click="activeType = 'all'; activeStatus = 'all'"
+      >
         <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Episodi Visti</span>
-          <UIcon name="i-lucide-play" class="h-4 w-4 text-amber-500" />
+          <span>Totale Completati</span>
+          <UIcon name="i-lucide-check-circle-2" class="h-4 w-4 text-purple-500" />
         </div>
         <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.totalEpisodes }}</span>
-          <span class="text-xs text-slate-400">totali</span>
-        </div>
-      </div>
-
-      <div class="surface-card rounded-2xl p-4 border border-slate-200/70 dark:border-slate-800">
-        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Pagine Lette</span>
-          <UIcon name="i-lucide-book-marked" class="h-4 w-4 text-purple-500" />
-        </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.totalPages }}</span>
-          <span class="text-xs text-slate-400">pagine</span>
+          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.completedCount }}</span>
+          <span class="text-xs text-slate-400">su {{ stats.total }} totali</span>
         </div>
       </div>
     </div>
@@ -122,12 +156,7 @@ const filteredItems = computed(() => {
       v-model:active-status="activeStatus"
       v-model:search-query="searchQuery"
       :view-mode="prefs.viewMode"
-      :counts="{
-        total: items.length,
-        inProgress: stats.inProgressCount,
-        completed: stats.completedCount,
-        planned: stats.plannedCount
-      }"
+      :counts="categoryCounts"
       @update:view-mode="update('viewMode', $event)"
     />
 

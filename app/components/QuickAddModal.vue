@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { MediaItem, MediaType, MediaStatus } from '~/types'
-import { MEDIA_TYPES, formatMinutesToTime, parseTimeToMinutes } from '~/utils/media'
+import { MEDIA_TYPES, formatMinutesToTime, parseTimeToMinutes, getCreatorLabel } from '~/utils/media'
 
 const props = defineProps<{
   open: boolean
@@ -12,10 +12,25 @@ const emit = defineEmits<{
   (e: 'add', payload: Omit<MediaItem, 'id' | 'user_id' | 'created_at' | 'updated_at'>): void
 }>()
 
+const toast = useToast()
+
 const selectedType = ref<MediaType>('series')
 const title = ref('')
+const creator = ref('')
+const releaseYear = ref<number | null>(null)
 const genre = ref('')
+const description = ref('')
+const coverUrl = ref('')
+const coverLoadError = ref(false)
 const status = ref<MediaStatus>('in_progress')
+
+watch(coverUrl, () => {
+  coverLoadError.value = false
+})
+
+// AI Autocomplete state
+const isAiLoading = ref(false)
+const aiError = ref<string | null>(null)
 
 // Rating & Review
 const rating = ref<number | null>(null)
@@ -49,7 +64,13 @@ watch(() => props.open, (isOpen) => {
   if (isOpen) {
     selectedType.value = props.initialType ?? 'series'
     title.value = ''
+    creator.value = ''
+    releaseYear.value = null
     genre.value = ''
+    description.value = ''
+    coverUrl.value = ''
+    coverLoadError.value = false
+    aiError.value = null
     status.value = 'in_progress'
     rating.value = null
     review.value = ''
@@ -71,6 +92,92 @@ watch(() => props.open, (isOpen) => {
     isFavorite.value = false
   }
 })
+
+async function handleAiAutocomplete() {
+  const cleanTitle = title.value.trim()
+  if (!cleanTitle) {
+    toast.add({
+      title: 'Inserisci un titolo',
+      description: 'Scrivi prima il titolo dell\'opera da autocompletare con l\'AI.',
+      color: 'warning'
+    })
+    return
+  }
+
+  isAiLoading.value = true
+  aiError.value = null
+
+  try {
+    const res = await $fetch<{
+      title: string
+      media_type: MediaType
+      creator: string | null
+      release_year: number | null
+      genre: string
+      description: string
+      cover_url: string | null
+      total_seasons: number | null
+      total_episodes: number | null
+      season_episodes: Record<string, number> | null
+      duration_minutes: number | null
+      total_duration: string | null
+      total_pages: number | null
+    }>('/api/ai/autocomplete', {
+      method: 'POST',
+      body: {
+        title: cleanTitle,
+        mediaType: selectedType.value
+      }
+    })
+
+    if (res) {
+      if (res.title) title.value = res.title
+      if (res.creator) creator.value = res.creator
+      if (res.release_year) releaseYear.value = res.release_year
+      if (res.genre) genre.value = res.genre
+      if (res.description) description.value = res.description
+      if (res.cover_url) coverUrl.value = res.cover_url
+
+      if (isSeries.value) {
+        if (res.total_seasons) totalSeasons.value = res.total_seasons
+        if (res.total_episodes) totalEpisodes.value = res.total_episodes
+        if (res.season_episodes && Object.keys(res.season_episodes).length > 0) {
+          seasonEpisodes.value = { ...res.season_episodes }
+          showSeasonBreakdown.value = true
+          const s1 = res.season_episodes['1'] || res.season_episodes[1]
+          if (s1 && (!season.value || season.value === 1)) {
+            totalEpisodes.value = s1
+          }
+        }
+      } else if (isMovie.value) {
+        if (res.duration_minutes) {
+          movieDurationHours.value = Math.floor(res.duration_minutes / 60)
+          movieDurationMinutes.value = res.duration_minutes % 60
+        }
+      } else if (isBook.value) {
+        if (res.total_pages) {
+          totalPages.value = res.total_pages
+        }
+      }
+
+      toast.add({
+        title: 'Dati compilati con Gemini AI! ✨',
+        description: `Informazioni e dettagli recuperati per "${res.title}".`,
+        color: 'success'
+      })
+    }
+  } catch (err: any) {
+    const msg = err?.data?.statusMessage || err?.message || 'Impossibile completare con AI'
+    aiError.value = msg
+    toast.add({
+      title: 'Errore AI Gemini',
+      description: msg,
+      color: 'error'
+    })
+  } finally {
+    isAiLoading.value = false
+  }
+}
 
 const isSeries = computed(() => selectedType.value === 'series')
 const isMovie = computed(() => selectedType.value === 'movie')
@@ -245,7 +352,10 @@ function handleAdd() {
     rating: rating.value,
     review: review.value.trim(),
     notes: '',
-    cover_url: null,
+    cover_url: coverUrl.value.trim() || null,
+    creator: creator.value.trim() || null,
+    release_year: releaseYear.value || null,
+    description: description.value.trim() || null,
     tags: [],
     genre: genre.value.trim(),
     is_favorite: isFavorite.value,
@@ -308,27 +418,139 @@ function handleAdd() {
         </div>
       </div>
 
-      <!-- Title & Genre -->
-      <div class="space-y-3">
-        <div class="space-y-1">
-          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Titolo dell'opera *</label>
+      <!-- Title & AI Auto-complete -->
+      <div class="space-y-1.5">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+            Titolo dell'opera <span class="text-rose-500">*</span>
+          </label>
+          <button
+            type="button"
+            :disabled="isAiLoading || !title.trim()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+            title="Recupera automaticamente copertina, dettagli, autore/regista, stagioni ed episodi con Gemini AI"
+            @click="handleAiAutocomplete"
+          >
+            <UIcon
+              :name="isAiLoading ? 'i-lucide-loader-2' : 'i-lucide-sparkles'"
+              class="h-3.5 w-3.5"
+              :class="isAiLoading ? 'animate-spin text-indigo-600' : 'text-indigo-600 dark:text-indigo-400'"
+            />
+            <span>{{ isAiLoading ? 'Cerco con Gemini...' : 'Completa con AI' }}</span>
+          </button>
+        </div>
+
+        <div class="relative">
           <input
             v-model="title"
             type="text"
             required
-            placeholder="es. Breaking Bad, Oppenheimer, Il Signore degli Anelli..."
+            placeholder="es. Breaking Bad, Oppenheimer, 1984, Dune..."
             class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            @keydown.enter.prevent="handleAiAutocomplete"
           />
         </div>
+      </div>
 
-        <div class="space-y-1">
-          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Genere o Categoria</label>
-          <input
-            v-model="genre"
-            type="text"
-            placeholder="es. Sci-Fi, Thriller, Fantasy, Storico..."
-            class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
-          />
+      <!-- Cover Image & Details Banner -->
+      <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
+        <div class="flex items-start gap-3.5">
+          <!-- Cover thumbnail or placeholder -->
+          <div class="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <img
+              v-if="coverUrl && !coverLoadError"
+              :src="coverUrl"
+              alt="Copertina"
+              class="h-full w-full object-cover transition duration-200 hover:scale-105"
+              @error="coverLoadError = true"
+              @load="coverLoadError = false"
+            />
+            <div v-else-if="coverUrl && coverLoadError" class="flex h-full w-full flex-col items-center justify-center p-1 text-center bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">
+              <UIcon name="i-lucide-image-off" class="h-5 w-5" />
+              <span class="text-[8px] font-bold mt-1 leading-tight">Link non visibile</span>
+            </div>
+            <div v-else class="flex h-full w-full flex-col items-center justify-center p-1 text-slate-400 dark:text-slate-500">
+              <UIcon name="i-lucide-image" class="h-6 w-6" />
+              <span class="text-[9px] font-semibold mt-1">Copertina</span>
+            </div>
+          </div>
+
+          <!-- Cover URL & Creator details -->
+          <div class="min-w-0 flex-1 space-y-2">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between">
+                <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  URL Copertina / Locandina
+                </label>
+                <button
+                  v-if="coverUrl"
+                  type="button"
+                  class="text-[10px] font-semibold text-rose-500 hover:text-rose-600"
+                  @click="coverUrl = ''"
+                >
+                  Rimuovi
+                </button>
+              </div>
+              <input
+                v-model="coverUrl"
+                type="url"
+                placeholder="https://... (compilata da AI o inserisci URL)"
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+              />
+            </div>
+
+            <!-- Creator & Year in sub-row -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="space-y-0.5">
+                <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  {{ getCreatorLabel(selectedType) }}
+                </label>
+                <input
+                  v-model="creator"
+                  type="text"
+                  :placeholder="selectedType === 'book' ? 'es. Tolkien' : selectedType === 'movie' ? 'es. Nolan' : 'es. Creatore'"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div class="space-y-0.5">
+                <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Anno
+                </label>
+                <input
+                  v-model.number="releaseYear"
+                  type="number"
+                  min="1800"
+                  max="2100"
+                  placeholder="es. 2024"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white text-center"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Genre & Description below preview -->
+        <div class="mt-3 space-y-2 border-t border-slate-200/60 pt-2.5 dark:border-slate-800">
+          <div class="space-y-0.5">
+            <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">Genere</label>
+            <input
+              v-model="genre"
+              type="text"
+              placeholder="es. Fantascienza, Thriller, Fantasy..."
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+
+          <div v-if="description || isAiLoading" class="space-y-0.5">
+            <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">Trama / Sinossi</label>
+            <textarea
+              v-model="description"
+              rows="2"
+              placeholder="Breve descrizione o trama dell'opera..."
+              class="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
         </div>
       </div>
 

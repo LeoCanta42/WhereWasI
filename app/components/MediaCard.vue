@@ -49,8 +49,9 @@ const isMovie = computed(() => props.item.media_type === 'movie' || props.item.p
         v-if="item.cover_url"
         :src="item.cover_url"
         :alt="item.title"
-        class="absolute inset-0 h-full w-full object-cover opacity-40 transition duration-300 group-hover:scale-105"
+        class="absolute inset-0 h-full w-full object-cover opacity-60 transition duration-300 group-hover:scale-105"
       />
+      <div v-if="item.cover_url" class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none" />
 
       <div class="relative z-10 flex items-start justify-between">
         <!-- Media Type Tag -->
@@ -106,9 +107,15 @@ const isMovie = computed(() => props.item.media_type === 'movie' || props.item.p
           {{ item.title }}
         </h3>
         
-        <p v-if="item.genre" class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-          {{ item.genre }}
-        </p>
+        <div class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
+          <span v-if="item.creator" class="font-medium text-slate-700 dark:text-slate-300 truncate max-w-[170px]">
+            {{ item.creator }}
+          </span>
+          <span v-if="item.creator && item.release_year" class="text-slate-400 dark:text-slate-600">•</span>
+          <span v-if="item.release_year" class="font-semibold text-slate-600 dark:text-slate-400">{{ item.release_year }}</span>
+          <span v-if="(item.creator || item.release_year) && item.genre" class="text-slate-400 dark:text-slate-600">•</span>
+          <span v-if="item.genre" class="truncate max-w-[140px]">{{ item.genre }}</span>
+        </div>
 
         <!-- Current Progress Display -->
         <div class="mt-3.5 flex items-center justify-between">

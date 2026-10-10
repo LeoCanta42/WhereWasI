@@ -294,3 +294,24 @@ export function getMediaGradient(type: MediaType, id: number | string = 1): stri
   const numId = typeof id === 'number' ? id : id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
   return list[Math.abs(numId) % list.length] ?? 'from-indigo-600 to-purple-800'
 }
+
+/**
+ * Returns the contextual label for the creator depending on media type
+ */
+export function getCreatorLabel(type?: MediaType | null): string {
+  switch (type) {
+    case 'book':
+      return 'Autore'
+    case 'movie':
+      return 'Regista'
+    case 'series':
+      return 'Creatore / Regista'
+    case 'game':
+      return 'Sviluppatore'
+    case 'podcast':
+      return 'Host / Autore'
+    default:
+      return 'Autore / Regista'
+  }
+}
+

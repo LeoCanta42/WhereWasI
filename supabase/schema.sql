@@ -102,6 +102,9 @@ CREATE TABLE IF NOT EXISTS public.media_items (
   review TEXT DEFAULT '',
   notes TEXT DEFAULT '',
   cover_url TEXT,
+  creator TEXT,
+  release_year INT,
+  description TEXT,
   tags TEXT[] DEFAULT '{}',
   genre TEXT DEFAULT '',
   
@@ -134,6 +137,9 @@ ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS rating NUMERIC(3, 1);
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS review TEXT DEFAULT '';
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS notes TEXT DEFAULT '';
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS cover_url TEXT;
+ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS creator TEXT;
+ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS release_year INT;
+ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS description TEXT;
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS genre TEXT DEFAULT '';
 ALTER TABLE public.media_items ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN NOT NULL DEFAULT FALSE;

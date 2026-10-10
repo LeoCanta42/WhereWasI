@@ -104,6 +104,9 @@ export interface Database {
           review: string
           notes: string
           cover_url: string | null
+          creator: string | null
+          release_year: number | null
+          description: string | null
           tags: string[]
           genre: string
           is_favorite: boolean
@@ -135,6 +138,9 @@ export interface Database {
           review?: string
           notes?: string
           cover_url?: string | null
+          creator?: string | null
+          release_year?: number | null
+          description?: string | null
           tags?: string[]
           genre?: string
           is_favorite?: boolean
@@ -166,6 +172,9 @@ export interface Database {
           review?: string
           notes?: string
           cover_url?: string | null
+          creator?: string | null
+          release_year?: number | null
+          description?: string | null
           tags?: string[]
           genre?: string
           is_favorite?: boolean

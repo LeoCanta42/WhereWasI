@@ -37,8 +37,17 @@ const isMovie = computed(() => props.item.media_type === 'movie' || props.item.p
   >
     <!-- Left: Icon & Info -->
     <div class="flex min-w-0 flex-1 cursor-pointer items-center gap-3" @click="emit('click', item)">
-      <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
-        <UIcon :name="typeInfo.icon" class="h-5 w-5" />
+      <div class="relative h-11 w-8 flex-shrink-0 overflow-hidden rounded-lg border border-slate-200/80 bg-slate-100 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+        <img
+          v-if="item.cover_url"
+          :src="item.cover_url"
+          :alt="item.title"
+          class="h-full w-full object-cover"
+          loading="lazy"
+        />
+        <div v-else class="flex h-full w-full items-center justify-center bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400">
+          <UIcon :name="typeInfo.icon" class="h-4 w-4" />
+        </div>
       </div>
 
       <div class="min-w-0 flex-1">
@@ -50,11 +59,12 @@ const isMovie = computed(() => props.item.media_type === 'movie' || props.item.p
           <UIcon v-if="item.is_private" name="i-lucide-lock" class="h-3 w-3 flex-shrink-0 text-slate-400" />
         </div>
 
-        <div class="mt-1 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+        <div class="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
           <span class="font-semibold text-indigo-600 dark:text-indigo-400">
             {{ progressText }}
           </span>
-          <span v-if="item.genre" class="hidden sm:inline">• {{ item.genre }}</span>
+          <span v-if="item.creator" class="hidden sm:inline truncate max-w-[150px]">• {{ item.creator }}</span>
+          <span v-else-if="item.genre" class="hidden sm:inline truncate max-w-[150px]">• {{ item.genre }}</span>
         </div>
       </div>
     </div>

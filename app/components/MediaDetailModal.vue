@@ -7,7 +7,8 @@ import {
   formatProgressDisplay,
   formatMinutesToTime,
   parseTimeToMinutes,
-  splitMinutesToHoursAndMinutes
+  splitMinutesToHoursAndMinutes,
+  getCreatorLabel
 } from '~/utils/media'
 import { useConfirm } from '~/composables/useConfirm'
 
@@ -24,9 +25,94 @@ const emit = defineEmits<{
 }>()
 
 const { ask } = useConfirm()
+const toast = useToast()
 
 const form = ref<Partial<MediaItem>>({})
 const seasonEpisodes = ref<Record<string, number>>({})
+const isAiLoading = ref(false)
+const coverLoadError = ref(false)
+
+watch(() => form.value.cover_url, () => {
+  coverLoadError.value = false
+})
+
+async function handleAiAutocomplete() {
+  const titleQuery = form.value.title?.trim()
+  if (!titleQuery) {
+    toast.add({
+      title: 'Inserisci un titolo',
+      description: 'Scrivi prima il titolo dell\'opera per effettuare la ricerca con Gemini.',
+      color: 'warning'
+    })
+    return
+  }
+
+  isAiLoading.value = true
+  try {
+    const res = await $fetch<{
+      title: string
+      media_type: MediaType
+      creator: string | null
+      release_year: number | null
+      genre: string
+      description: string
+      cover_url: string | null
+      total_seasons: number | null
+      total_episodes: number | null
+      season_episodes: Record<string, number> | null
+      duration_minutes: number | null
+      total_duration: string | null
+      total_pages: number | null
+    }>('/api/ai/autocomplete', {
+      method: 'POST',
+      body: {
+        title: titleQuery,
+        mediaType: form.value.media_type || 'series'
+      }
+    })
+
+    if (res) {
+      if (res.title) form.value.title = res.title
+      if (res.creator) form.value.creator = res.creator
+      if (res.release_year) form.value.release_year = res.release_year
+      if (res.genre) form.value.genre = res.genre
+      if (res.description) form.value.description = res.description
+      if (res.cover_url) form.value.cover_url = res.cover_url
+
+      if (isSeries.value) {
+        if (res.total_seasons) form.value.total_seasons = res.total_seasons
+        if (res.total_episodes) form.value.total_episodes = res.total_episodes
+        if (res.season_episodes && Object.keys(res.season_episodes).length > 0) {
+          seasonEpisodes.value = { ...res.season_episodes }
+        }
+      } else if (isMovie.value) {
+        if (res.duration_minutes) {
+          movieDurationHours.value = Math.floor(res.duration_minutes / 60)
+          movieDurationMinutes.value = res.duration_minutes % 60
+          form.value.total_duration = res.total_duration
+        }
+      } else if (isBook.value) {
+        if (res.total_pages) {
+          form.value.total_pages = res.total_pages
+        }
+      }
+
+      toast.add({
+        title: 'Info aggiornate con Gemini AI! ✨',
+        description: `Dettagli e locandina aggiornati per "${res.title}".`,
+        color: 'success'
+      })
+    }
+  } catch (err: any) {
+    toast.add({
+      title: 'Errore AI Gemini',
+      description: err?.data?.statusMessage || err?.message || 'Impossibile aggiornare i dettagli.',
+      color: 'error'
+    })
+  } finally {
+    isAiLoading.value = false
+  }
+}
 
 // Film time fields
 const movieStopHours = ref<number>(0)
@@ -188,28 +274,143 @@ async function handleDelete() {
         <p class="font-medium">Stai visualizzando il progresso di un tuo amico.</p>
       </div>
 
-      <!-- Title & Type -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div class="sm:col-span-2 space-y-1">
-          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Titolo</label>
-          <input
-            v-model="form.title"
-            :disabled="readonly"
-            type="text"
-            required
-            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
-          />
+      <!-- Title, Type & AI Completion -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Dettagli Opera</label>
+          <button
+            v-if="!readonly"
+            type="button"
+            :disabled="isAiLoading || !form.title?.trim()"
+            class="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100 disabled:opacity-40 dark:border-indigo-800 dark:bg-indigo-950/70 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
+            title="Recupera automaticamente copertina, dettagli, autore/regista, stagioni con Gemini AI"
+            @click="handleAiAutocomplete"
+          >
+            <UIcon
+              :name="isAiLoading ? 'i-lucide-loader-2' : 'i-lucide-sparkles'"
+              class="h-3.5 w-3.5"
+              :class="isAiLoading ? 'animate-spin text-indigo-600' : 'text-indigo-600 dark:text-indigo-400'"
+            />
+            <span>{{ isAiLoading ? 'Ricerca con Gemini...' : 'Completa con AI' }}</span>
+          </button>
         </div>
 
-        <div class="space-y-1">
-          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Categoria</label>
-          <select
-            v-model="form.media_type"
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="sm:col-span-2 space-y-1">
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Titolo</label>
+            <input
+              v-model="form.title"
+              :disabled="readonly"
+              type="text"
+              required
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
+            />
+          </div>
+
+          <div class="space-y-1">
+            <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Categoria</label>
+            <select
+              v-model="form.media_type"
+              :disabled="readonly"
+              class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
+            >
+              <option v-for="t in MEDIA_TYPES" :key="t.id" :value="t.id">{{ t.label }}</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cover Art & Creator & Year Box -->
+      <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-900/50">
+        <div class="flex items-start gap-3.5">
+          <!-- Thumbnail preview -->
+          <div class="relative h-24 w-16 flex-shrink-0 overflow-hidden rounded-xl border border-slate-200 bg-slate-200 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <img
+              v-if="form.cover_url && !coverLoadError"
+              :src="form.cover_url"
+              alt="Copertina"
+              class="h-full w-full object-cover transition hover:scale-105"
+              @error="coverLoadError = true"
+              @load="coverLoadError = false"
+            />
+            <div v-else-if="form.cover_url && coverLoadError" class="flex h-full w-full flex-col items-center justify-center p-1 text-center bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400">
+              <UIcon name="i-lucide-image-off" class="h-5 w-5" />
+              <span class="text-[8px] font-bold mt-1 leading-tight">Link non visibile</span>
+            </div>
+            <div v-else class="flex h-full w-full flex-col items-center justify-center p-1 text-slate-400 dark:text-slate-500">
+              <UIcon name="i-lucide-image" class="h-6 w-6" />
+              <span class="text-[9px] font-semibold mt-1">Cover</span>
+            </div>
+          </div>
+
+          <!-- Cover URL, Creator & Year Inputs -->
+          <div class="min-w-0 flex-1 space-y-2">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between">
+                <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  URL Copertina / Locandina
+                </label>
+                <button
+                  v-if="form.cover_url && !readonly"
+                  type="button"
+                  class="text-[10px] font-semibold text-rose-500 hover:text-rose-600"
+                  @click="form.cover_url = null"
+                >
+                  Rimuovi
+                </button>
+              </div>
+              <input
+                v-model="form.cover_url"
+                :disabled="readonly"
+                type="url"
+                placeholder="https://... (URL immagine copertina)"
+                class="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
+              />
+            </div>
+
+            <!-- Creator & Year in sub-row -->
+            <div class="grid grid-cols-2 gap-2">
+              <div class="space-y-0.5">
+                <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  {{ getCreatorLabel(form.media_type) }}
+                </label>
+                <input
+                  v-model="form.creator"
+                  :disabled="readonly"
+                  type="text"
+                  placeholder="es. Autore / Regista"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
+                />
+              </div>
+
+              <div class="space-y-0.5">
+                <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                  Anno
+                </label>
+                <input
+                  v-model.number="form.release_year"
+                  :disabled="readonly"
+                  type="number"
+                  min="1800"
+                  max="2100"
+                  placeholder="es. 2024"
+                  class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white text-center disabled:opacity-75"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Description / Synopsis -->
+        <div v-if="form.description || !readonly" class="mt-3 border-t border-slate-200/60 pt-2.5 dark:border-slate-800">
+          <label class="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">Trama / Sinossi</label>
+          <textarea
+            v-model="form.description"
             :disabled="readonly"
-            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
-          >
-            <option v-for="t in MEDIA_TYPES" :key="t.id" :value="t.id">{{ t.label }}</option>
-          </select>
+            rows="2"
+            placeholder="Breve descrizione o trama dell'opera..."
+            class="w-full rounded-xl border border-slate-200 bg-white p-2.5 text-xs text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none dark:border-slate-800 dark:bg-slate-900 dark:text-white disabled:opacity-75"
+          />
         </div>
       </div>
 

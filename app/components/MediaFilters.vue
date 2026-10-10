@@ -32,12 +32,38 @@ const typeTabs = computed(() => [
   { id: 'other', label: 'Altro', icon: 'i-lucide-bookmark' }
 ])
 
-const statusTabs = computed(() => [
-  { id: 'in_progress', label: `In Corso (${props.counts.inProgress})` },
-  { id: 'planned', label: `Da Iniziare (${props.counts.planned})` },
-  { id: 'completed', label: `Completati (${props.counts.completed})` },
-  { id: 'all', label: `Tutti (${props.counts.total})` }
-])
+const statusTabs = computed(() => {
+  if (props.activeType === 'movie') {
+    return [
+      { id: 'in_progress', label: `In Visione (${props.counts.inProgress})` },
+      { id: 'planned', label: `Da Guardare (${props.counts.planned})` },
+      { id: 'completed', label: `Visti (${props.counts.completed})` },
+      { id: 'all', label: `Tutti i Film (${props.counts.total})` }
+    ]
+  }
+  if (props.activeType === 'book') {
+    return [
+      { id: 'in_progress', label: `In Lettura (${props.counts.inProgress})` },
+      { id: 'planned', label: `Da Leggere (${props.counts.planned})` },
+      { id: 'completed', label: `Letti (${props.counts.completed})` },
+      { id: 'all', label: `Tutti i Libri (${props.counts.total})` }
+    ]
+  }
+  if (props.activeType === 'series') {
+    return [
+      { id: 'in_progress', label: `In Corso (${props.counts.inProgress})` },
+      { id: 'planned', label: `Da Iniziare (${props.counts.planned})` },
+      { id: 'completed', label: `Completate (${props.counts.completed})` },
+      { id: 'all', label: `Tutte le Serie (${props.counts.total})` }
+    ]
+  }
+  return [
+    { id: 'in_progress', label: `In Corso (${props.counts.inProgress})` },
+    { id: 'planned', label: `Da Iniziare (${props.counts.planned})` },
+    { id: 'completed', label: `Completati (${props.counts.completed})` },
+    { id: 'all', label: `Tutti (${props.counts.total})` }
+  ]
+})
 </script>
 
 <template>

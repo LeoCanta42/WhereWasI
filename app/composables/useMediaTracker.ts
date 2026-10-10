@@ -419,11 +419,20 @@ export function useMediaTracker() {
     const planned = all.filter((i) => i.status === 'planned')
     const favorites = all.filter((i) => i.is_favorite)
 
+    const seriesTotal = all.filter((i) => i.media_type === 'series').length
     const seriesWatching = inProgress.filter((i) => i.media_type === 'series').length
     const seriesCompleted = completed.filter((i) => i.media_type === 'series').length
+    const seriesPlanned = planned.filter((i) => i.media_type === 'series').length
+
+    const booksTotal = all.filter((i) => i.media_type === 'book').length
     const booksReading = inProgress.filter((i) => i.media_type === 'book').length
     const booksCompleted = completed.filter((i) => i.media_type === 'book').length
+    const booksPlanned = planned.filter((i) => i.media_type === 'book').length
+
+    const moviesTotal = all.filter((i) => i.media_type === 'movie').length
+    const moviesWatching = inProgress.filter((i) => i.media_type === 'movie').length
     const moviesWatched = completed.filter((i) => i.media_type === 'movie').length
+    const moviesPlanned = planned.filter((i) => i.media_type === 'movie').length
 
     let totalEpisodes = 0
     let totalPages = 0
@@ -442,11 +451,18 @@ export function useMediaTracker() {
       completedCount: completed.length,
       plannedCount: planned.length,
       favoritesCount: favorites.length,
+      seriesTotal,
       seriesWatching,
       seriesCompleted,
+      seriesPlanned,
+      booksTotal,
       booksReading,
       booksCompleted,
+      booksPlanned,
+      moviesTotal,
+      moviesWatching,
       moviesWatched,
+      moviesPlanned,
       totalEpisodes,
       totalPages
     }

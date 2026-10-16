@@ -1,7 +1,14 @@
 import type { Database } from '~/types/database.types'
 import type { MediaItem, MediaStatus, MediaType, ProgressType } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
-import { formatProgressDisplay, getEpisodesForSeason, parseTimeToMinutes, formatMinutesToTime } from '~/utils/media'
+import { usePreferences, type SortOptionId } from '~/composables/usePreferences'
+import {
+  formatProgressDisplay,
+  getEpisodesForSeason,
+  parseTimeToMinutes,
+  formatMinutesToTime,
+  sortMediaItems
+} from '~/utils/media'
 
 export function useMediaTracker() {
   const supabase = useSupabaseClient<Database>()
@@ -26,12 +33,12 @@ export function useMediaTracker() {
         .from('media_items')
         .select('*')
         .eq('user_id', id)
-        .order('updated_at', { ascending: false })
 
       if (error) {
         console.error('Error loading media items:', error)
       } else {
-        items.value = (data as unknown as MediaItem[]) ?? []
+        const { prefs } = usePreferences()
+        items.value = sortMediaItems((data as unknown as MediaItem[]) ?? [], prefs.value.sortBy)
       }
       loaded.value = true
     } catch (err) {
@@ -156,9 +163,8 @@ export function useMediaTracker() {
 
       const updated = data as unknown as MediaItem
       if (oldIndex !== -1) {
-        // Move updated to top or replace in place
-        items.value.splice(oldIndex, 1)
-        items.value.unshift(updated)
+        // Keep item in its exact position so it stays still
+        items.value.splice(oldIndex, 1, updated)
       }
 
       // Check if progress or status changed to log activity
@@ -246,12 +252,14 @@ export function useMediaTracker() {
   }
 
   /**
-   * Fast increment for one-click updates
+   * Fast increment for one-click updates (uses user preferences by default or customStep)
    */
-  async function incrementProgress(item: MediaItem, step = 1): Promise<void> {
+  async function incrementProgress(item: MediaItem, customStep?: number): Promise<void> {
+    const { prefs } = usePreferences()
     const updates: Partial<MediaItem> = {}
 
     if (item.media_type === 'series' || item.progress_type === 'episode_season') {
+      const step = customStep ?? prefs.value.seriesStep ?? 1
       const currentSeason = item.season ?? 1
       const currentEp = item.episode ?? 0
       const totalSeasons = item.total_seasons
@@ -289,9 +297,9 @@ export function useMediaTracker() {
         }
       }
     } else if (item.media_type === 'movie' || item.progress_type === 'time') {
+      const step = customStep ?? prefs.value.movieStep ?? 10
       const currentMin = parseTimeToMinutes(item.time_stopped || item.current_unit)
-      const stepMinutes = 10 // +10 minutes per click
-      const newMinutes = currentMin + stepMinutes
+      const newMinutes = currentMin + step
       const formatted = formatMinutesToTime(newMinutes)
 
       updates.time_stopped = formatted
@@ -310,6 +318,7 @@ export function useMediaTracker() {
         }
       }
     } else if (item.media_type === 'book' || item.progress_type === 'pages') {
+      const step = customStep ?? prefs.value.bookStep ?? 10
       const nextP = (item.current_page ?? 0) + step
       updates.current_page = nextP
       if (item.status === 'planned') {
@@ -320,6 +329,7 @@ export function useMediaTracker() {
         updates.completed_at = new Date().toISOString()
       }
     } else if (item.progress_type === 'percentage') {
+      const step = customStep ?? 5
       const nextPct = Math.min(100, (item.percentage ?? 0) + step)
       updates.percentage = nextPct
       if (nextPct >= 100) {
@@ -327,6 +337,7 @@ export function useMediaTracker() {
         updates.completed_at = new Date().toISOString()
       }
     } else if (item.progress_type === 'chapter') {
+      const step = customStep ?? 1
       const nextCh = (item.current_page ?? item.episode ?? 0) + step
       updates.current_page = nextCh
     }
@@ -334,10 +345,12 @@ export function useMediaTracker() {
     await updateItem(item.id, updates)
   }
 
-  async function decrementProgress(item: MediaItem, step = 1): Promise<void> {
+  async function decrementProgress(item: MediaItem, customStep?: number): Promise<void> {
+    const { prefs } = usePreferences()
     const updates: Partial<MediaItem> = {}
 
     if (item.media_type === 'series' || item.progress_type === 'episode_season') {
+      const step = customStep ?? prefs.value.seriesStep ?? 1
       const currentSeason = item.season ?? 1
       const currentEp = item.episode ?? 0
 
@@ -356,9 +369,9 @@ export function useMediaTracker() {
         updates.status = 'in_progress'
       }
     } else if (item.media_type === 'movie' || item.progress_type === 'time') {
+      const step = customStep ?? prefs.value.movieStep ?? 10
       const currentMin = parseTimeToMinutes(item.time_stopped || item.current_unit)
-      const stepMinutes = 10
-      const newMinutes = Math.max(0, currentMin - stepMinutes)
+      const newMinutes = Math.max(0, currentMin - step)
       const formatted = formatMinutesToTime(newMinutes)
 
       updates.time_stopped = formatted
@@ -367,15 +380,21 @@ export function useMediaTracker() {
         updates.status = 'in_progress'
       }
     } else if (item.media_type === 'book' || item.progress_type === 'pages') {
+      const step = customStep ?? prefs.value.bookStep ?? 10
       updates.current_page = Math.max(0, (item.current_page ?? 0) - step)
       if (item.status === 'completed') {
         updates.status = 'in_progress'
       }
     } else if (item.progress_type === 'percentage') {
+      const step = customStep ?? 5
       updates.percentage = Math.max(0, (item.percentage ?? 0) - step)
       if (item.status === 'completed') {
         updates.status = 'in_progress'
       }
+    } else if (item.progress_type === 'chapter') {
+      const step = customStep ?? 1
+      const nextCh = Math.max(0, (item.current_page ?? item.episode ?? 0) - step)
+      updates.current_page = nextCh
     }
 
     await updateItem(item.id, updates)
@@ -468,6 +487,12 @@ export function useMediaTracker() {
     }
   })
 
+  function sortItems(sortBy?: SortOptionId) {
+    const { prefs } = usePreferences()
+    const sort = sortBy || prefs.value.sortBy
+    items.value = sortMediaItems(items.value, sort)
+  }
+
   return {
     items,
     loading,
@@ -481,6 +506,8 @@ export function useMediaTracker() {
     decrementProgress,
     toggleFavorite,
     togglePrivate,
-    setStatus
+    setStatus,
+    sortItems
   }
 }
+

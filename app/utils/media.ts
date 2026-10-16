@@ -315,3 +315,65 @@ export function getCreatorLabel(type?: MediaType | null): string {
   }
 }
 
+export interface SortOption {
+  id: import('~/composables/usePreferences').SortOptionId
+  label: string
+  icon: string
+}
+
+export const SORT_OPTIONS: SortOption[] = [
+  { id: 'created_desc', label: 'Data aggiunta (recenti)', icon: 'i-lucide-calendar-arrow-down' },
+  { id: 'created_asc', label: 'Data aggiunta (meno recenti)', icon: 'i-lucide-calendar-arrow-up' },
+  { id: 'updated_desc', label: 'Ultima modifica', icon: 'i-lucide-history' },
+  { id: 'title_asc', label: 'Titolo (A - Z)', icon: 'i-lucide-arrow-down-a-z' },
+  { id: 'title_desc', label: 'Titolo (Z - A)', icon: 'i-lucide-arrow-down-z-a' },
+  { id: 'rating_desc', label: 'Valutazione più alta', icon: 'i-lucide-star' },
+  { id: 'progress_desc', label: 'Progresso (%)', icon: 'i-lucide-percent' }
+]
+
+export function sortMediaItems(
+  list: MediaItem[],
+  sortBy: import('~/composables/usePreferences').SortOptionId = 'created_desc'
+): MediaItem[] {
+  return [...list].sort((a, b) => {
+    switch (sortBy) {
+      case 'updated_desc': {
+        const timeA = a.updated_at ? new Date(a.updated_at).getTime() : 0
+        const timeB = b.updated_at ? new Date(b.updated_at).getTime() : 0
+        return timeB - timeA
+      }
+      case 'created_asc': {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return timeA - timeB
+      }
+      case 'created_desc': {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return timeB - timeA
+      }
+      case 'title_asc':
+        return (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base', numeric: true })
+      case 'title_desc':
+        return (b.title || '').localeCompare(a.title || '', undefined, { sensitivity: 'base', numeric: true })
+      case 'rating_desc':
+        return (b.rating ?? -1) - (a.rating ?? -1)
+      case 'progress_desc': {
+        const getPct = (it: MediaItem) => {
+          if (it.percentage != null) return it.percentage
+          if (it.total_pages && it.current_page) return Math.min(100, Math.round((it.current_page / it.total_pages) * 100))
+          if (it.total_episodes && it.episode) return Math.min(100, Math.round((it.episode / it.total_episodes) * 100))
+          return 0
+        }
+        return getPct(b) - getPct(a)
+      }
+      default: {
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return timeB - timeA
+      }
+    }
+  })
+}
+
+

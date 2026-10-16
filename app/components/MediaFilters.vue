@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { MediaStatus, MediaType } from '~/types'
-import { MEDIA_TYPES } from '~/utils/media'
+import { MEDIA_TYPES, SORT_OPTIONS } from '~/utils/media'
+import type { SortOptionId } from '~/composables/usePreferences'
 
 const props = defineProps<{
   activeType: MediaType | 'all'
   activeStatus: MediaStatus | 'all'
   searchQuery: string
   viewMode: 'grid' | 'list'
+  sortBy?: SortOptionId
   counts: {
     total: number
     inProgress: number
@@ -20,6 +22,8 @@ const emit = defineEmits<{
   (e: 'update:activeStatus', value: MediaStatus | 'all'): void
   (e: 'update:searchQuery', value: string): void
   (e: 'update:viewMode', value: 'grid' | 'list'): void
+  (e: 'update:sortBy', value: SortOptionId): void
+  (e: 'reorder'): void
 }>()
 
 const typeTabs = computed(() => [
@@ -68,7 +72,7 @@ const statusTabs = computed(() => {
 
 <template>
   <div class="space-y-4">
-    <!-- Row 1: Search & View Toggle -->
+    <!-- Row 1: Search & Controls (Sort + View Switcher) -->
     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
       <!-- Search Input -->
       <div class="relative flex-1">
@@ -90,30 +94,61 @@ const statusTabs = computed(() => {
         </button>
       </div>
 
-      <!-- View Switcher (Grid / List) -->
-      <div class="flex items-center gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800/80 self-end sm:self-auto">
-        <button
-          type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-xl transition"
-          :class="viewMode === 'grid'
-            ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
-            : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
-          title="Vista a Griglia"
-          @click="emit('update:viewMode', 'grid')"
-        >
-          <UIcon name="i-lucide-layout-grid" class="h-4 w-4" />
-        </button>
-        <button
-          type="button"
-          class="flex h-8 w-8 items-center justify-center rounded-xl transition"
-          :class="viewMode === 'list'
-            ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
-            : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
-          title="Vista a Elenco"
-          @click="emit('update:viewMode', 'list')"
-        >
-          <UIcon name="i-lucide-list" class="h-4 w-4" />
-        </button>
+      <!-- Controls: Sort + View Switcher -->
+      <div class="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+        <!-- Sort Dropdown -->
+        <div class="flex items-center gap-1.5 rounded-2xl bg-slate-100 px-2.5 py-1 dark:bg-slate-800/80">
+          <UIcon name="i-lucide-arrow-up-down" class="h-3.5 w-3.5 text-slate-400 shrink-0" />
+          <select
+            :value="sortBy || 'created_desc'"
+            class="bg-transparent text-xs font-semibold text-slate-700 focus:outline-none dark:text-slate-300 cursor-pointer pr-1 py-1"
+            title="Ordina la lista"
+            @change="emit('update:sortBy', ($event.target as HTMLSelectElement).value as any)"
+          >
+            <option
+              v-for="opt in SORT_OPTIONS"
+              :key="opt.id"
+              :value="opt.id"
+              class="bg-white text-slate-900 dark:bg-slate-900 dark:text-white"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
+          <button
+            type="button"
+            class="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-200/70 hover:text-slate-600 dark:hover:bg-slate-700 dark:hover:text-slate-200 transition"
+            title="Riordina adesso secondo il criterio selezionato"
+            @click="emit('reorder')"
+          >
+            <UIcon name="i-lucide-rotate-cw" class="h-3 w-3" />
+          </button>
+        </div>
+
+        <!-- View Switcher (Grid / List) -->
+        <div class="flex items-center gap-1 rounded-2xl bg-slate-100 p-1 dark:bg-slate-800/80">
+          <button
+            type="button"
+            class="flex h-8 w-8 items-center justify-center rounded-xl transition"
+            :class="viewMode === 'grid'
+              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
+              : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+            title="Vista a Griglia"
+            @click="emit('update:viewMode', 'grid')"
+          >
+            <UIcon name="i-lucide-layout-grid" class="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            class="flex h-8 w-8 items-center justify-center rounded-xl transition"
+            :class="viewMode === 'list'
+              ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-900 dark:text-white'
+              : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'"
+            title="Vista a Elenco"
+            @click="emit('update:viewMode', 'list')"
+          >
+            <UIcon name="i-lucide-list" class="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
 

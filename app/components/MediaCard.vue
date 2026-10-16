@@ -28,9 +28,41 @@ const progressText = computed(() => formatProgressDisplay(props.item))
 const shortProgressText = computed(() => formatProgressDisplay(props.item, true))
 const gradientClass = computed(() => getMediaGradient(props.item.media_type, props.item.id))
 
+import { usePreferences } from '~/composables/usePreferences'
+
+const { prefs } = usePreferences()
+
 const isSeries = computed(() => props.item.media_type === 'series')
 const isBook = computed(() => props.item.media_type === 'book')
 const isMovie = computed(() => props.item.media_type === 'movie' || props.item.progress_type === 'time')
+
+const stepValue = computed(() => {
+  if (isSeries.value) return prefs.value.seriesStep ?? 1
+  if (isMovie.value) return prefs.value.movieStep ?? 10
+  if (isBook.value) return prefs.value.bookStep ?? 10
+  return 1
+})
+
+const incrementLabel = computed(() => {
+  if (isSeries.value) return `${stepValue.value} Ep`
+  if (isMovie.value) return `${stepValue.value}m`
+  if (isBook.value) return `${stepValue.value} Pag`
+  return `${stepValue.value}`
+})
+
+const incrementTitle = computed(() => {
+  if (isSeries.value) return `+${stepValue.value} Episodio`
+  if (isMovie.value) return `+${stepValue.value} Minuti`
+  if (isBook.value) return `+${stepValue.value} Pagine`
+  return `+${stepValue.value} Avanzamento`
+})
+
+const decrementTitle = computed(() => {
+  if (isSeries.value) return `-${stepValue.value} Episodio`
+  if (isMovie.value) return `-${stepValue.value} Minuti`
+  if (isBook.value) return `-${stepValue.value} Pagine`
+  return `-${stepValue.value} Avanzamento`
+})
 </script>
 
 <template>
@@ -153,21 +185,21 @@ const isMovie = computed(() => props.item.media_type === 'movie' || props.item.p
           <button
             type="button"
             class="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-700 transition hover:bg-slate-200 active:scale-95 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            title="Diminuisci progresso (-1)"
+            :title="decrementTitle"
             @click="emit('decrement', item)"
           >
             <UIcon name="i-lucide-minus" class="h-3.5 w-3.5" />
           </button>
 
-          <!-- Increment +1 / +10m / +10 Pag -->
+          <!-- Increment -->
           <button
             type="button"
             class="inline-flex h-8 items-center gap-1 rounded-xl bg-indigo-50 px-2.5 text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 active:scale-95 dark:bg-indigo-950/60 dark:text-indigo-300 dark:hover:bg-indigo-900/60"
-            :title="isSeries ? '+1 Episodio' : isMovie ? '+10 Minuti' : isBook ? '+10 Pagine' : '+1 Avanzamento'"
+            :title="incrementTitle"
             @click="emit('increment', item)"
           >
             <UIcon name="i-lucide-plus" class="h-3.5 w-3.5" />
-            <span>{{ isSeries ? '+1 Ep' : isMovie ? '+10m' : isBook ? '+10 Pag' : '+1' }}</span>
+            <span>{{ incrementLabel }}</span>
           </button>
         </div>
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { MediaItem, MediaStatus, MediaType } from '~/types'
 import { useMediaTracker } from '~/composables/useMediaTracker'
-import { usePreferences } from '~/composables/usePreferences'
+import { usePreferences, type SortOptionId } from '~/composables/usePreferences'
 import { useQuickAdd } from '~/composables/useQuickAdd'
 
 const {
@@ -15,11 +15,17 @@ const {
   incrementProgress,
   decrementProgress,
   toggleFavorite,
-  setStatus
+  setStatus,
+  sortItems
 } = useMediaTracker()
 
 const { prefs, update } = usePreferences()
 const { openQuickAdd } = useQuickAdd()
+
+function handleSortChange(newSort: SortOptionId) {
+  update('sortBy', newSort)
+  sortItems(newSort)
+}
 
 const activeType = ref<MediaType | 'all'>('all')
 const activeStatus = ref<MediaStatus | 'all'>('in_progress')
@@ -156,8 +162,11 @@ const filteredItems = computed(() => {
       v-model:active-status="activeStatus"
       v-model:search-query="searchQuery"
       :view-mode="prefs.viewMode"
+      :sort-by="prefs.sortBy"
       :counts="categoryCounts"
       @update:view-mode="update('viewMode', $event)"
+      @update:sort-by="handleSortChange"
+      @reorder="sortItems()"
     />
 
     <!-- Items Grid / List -->

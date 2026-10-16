@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ACCENTS, usePreferences } from '~/composables/usePreferences'
+import { ACCENTS, usePreferences, type SortOptionId } from '~/composables/usePreferences'
+import { SORT_OPTIONS } from '~/utils/media'
 import { useAppearance } from '~/composables/useAppearance'
 import { useProfile } from '~/composables/useProfile'
 import { useAuth } from '~/composables/useAuth'
@@ -111,6 +112,131 @@ async function handleChangePassword() {
               <span class="truncate max-w-[50px]">{{ acc.label }}</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      <!-- Quick Steps & Default Sorting Section -->
+      <div class="space-y-4 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Pulsanti Rapidi (+ / -) & Ordinamento</h3>
+
+        <!-- Libri step -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Pagine Libri (+ / - per click)</label>
+            <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400">+{{ prefs.bookStep }} pag</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex flex-wrap gap-1.5 flex-1">
+              <button
+                v-for="step in [1, 5, 10, 20, 25, 50]"
+                :key="step"
+                type="button"
+                class="rounded-lg px-2.5 py-1 text-xs font-bold transition border"
+                :class="prefs.bookStep === step
+                  ? 'border-emerald-600 bg-emerald-50 text-emerald-700 dark:border-emerald-400 dark:bg-emerald-950 dark:text-emerald-300'
+                  : 'border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-50'"
+                @click="update('bookStep', step)"
+              >
+                {{ step }}
+              </button>
+            </div>
+            <div class="w-20">
+              <input
+                :value="prefs.bookStep"
+                type="number"
+                min="1"
+                max="999"
+                class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-center font-bold text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                @input="update('bookStep', Math.max(1, parseInt(($event.target as HTMLInputElement).value || '1', 10)))"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Film step -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Minuti Film (+ / - per click)</label>
+            <span class="text-xs font-bold text-amber-600 dark:text-amber-400">+{{ prefs.movieStep }}m</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex flex-wrap gap-1.5 flex-1">
+              <button
+                v-for="step in [5, 10, 15, 20, 30, 60]"
+                :key="step"
+                type="button"
+                class="rounded-lg px-2.5 py-1 text-xs font-bold transition border"
+                :class="prefs.movieStep === step
+                  ? 'border-amber-500 bg-amber-50 text-amber-700 dark:border-amber-400 dark:bg-amber-950 dark:text-amber-300'
+                  : 'border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-50'"
+                @click="update('movieStep', step)"
+              >
+                {{ step }}m
+              </button>
+            </div>
+            <div class="w-20">
+              <input
+                :value="prefs.movieStep"
+                type="number"
+                min="1"
+                max="240"
+                class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-center font-bold text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                @input="update('movieStep', Math.max(1, parseInt(($event.target as HTMLInputElement).value || '1', 10)))"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Serie TV step -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-700 dark:text-slate-300">Episodi Serie TV (+ / - per click)</label>
+            <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400">+{{ prefs.seriesStep }} ep</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <div class="flex flex-wrap gap-1.5 flex-1">
+              <button
+                v-for="step in [1, 2, 3]"
+                :key="step"
+                type="button"
+                class="rounded-lg px-2.5 py-1 text-xs font-bold transition border"
+                :class="prefs.seriesStep === step
+                  ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-400 dark:bg-indigo-950 dark:text-indigo-300'
+                  : 'border-slate-200 bg-white text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 hover:bg-slate-50'"
+                @click="update('seriesStep', step)"
+              >
+                {{ step }} ep
+              </button>
+            </div>
+            <div class="w-20">
+              <input
+                :value="prefs.seriesStep"
+                type="number"
+                min="1"
+                max="20"
+                class="w-full rounded-xl border border-slate-200 bg-white px-2.5 py-1 text-xs text-center font-bold text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                @input="update('seriesStep', Math.max(1, parseInt(($event.target as HTMLInputElement).value || '1', 10)))"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Default Sort -->
+        <div class="space-y-1.5 pt-1">
+          <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300">Ordinamento predefinito della lista</label>
+          <select
+            :value="prefs.sortBy"
+            class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-white cursor-pointer"
+            @change="update('sortBy', ($event.target as HTMLSelectElement).value as any)"
+          >
+            <option
+              v-for="opt in SORT_OPTIONS"
+              :key="opt.id"
+              :value="opt.id"
+            >
+              {{ opt.label }}
+            </option>
+          </select>
         </div>
       </div>
 

@@ -97,6 +97,9 @@ watch(user, async (currentUser) => {
         @open-settings="isSettingsOpen = true"
       />
 
+      <!-- Offline and Sync Status Banner -->
+      <OfflineBanner />
+
       <!-- Main viewport -->
       <main :class="user && isApproved ? 'pb-safe-nav md:pb-8' : ''">
         <!-- Unauthenticated: Login / Sign up -->

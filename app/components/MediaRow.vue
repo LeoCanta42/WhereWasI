@@ -87,6 +87,14 @@ const decrementTitle = computed(() => {
           <h3 class="truncate text-sm font-bold text-slate-900 dark:text-white">
             {{ item.title }}
           </h3>
+          <span
+            v-if="item.id < 0"
+            class="inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300"
+            title="Creato offline — in attesa di sincronizzazione cloud"
+          >
+            <UIcon name="i-lucide-cloud-upload" class="h-3 w-3" />
+            <span class="hidden sm:inline">Offline</span>
+          </span>
           <UIcon v-if="item.is_favorite" name="i-lucide-star" class="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400" />
           <UIcon v-if="item.is_private" name="i-lucide-lock" class="h-3 w-3 flex-shrink-0 text-slate-400" />
         </div>

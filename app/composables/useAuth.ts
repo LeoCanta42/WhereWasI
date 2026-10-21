@@ -5,7 +5,7 @@ import { MIN_PASSWORD_LENGTH } from '~/utils/password'
 export function useAuth() {
   const supabase = useSupabaseClient<Database>()
   const user = useSupabaseUser()
-  const { userEmail } = useCurrentUser()
+  const { userEmail, clearFallbackUser } = useCurrentUser()
   const toast = useToast()
 
   const loading = ref(false)
@@ -155,6 +155,7 @@ export function useAuth() {
 
   async function logout(): Promise<void> {
     try {
+      clearFallbackUser()
       await supabase.auth.signOut()
       await navigateTo('/')
       toast.add({

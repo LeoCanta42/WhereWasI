@@ -86,11 +86,22 @@ const decrementTitle = computed(() => {
       <div v-if="item.cover_url" class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40 pointer-events-none" />
 
       <div class="relative z-10 flex items-start justify-between">
-        <!-- Media Type Tag -->
-        <span class="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white">
-          <UIcon :name="typeInfo.icon" class="h-3.5 w-3.5" />
-          <span>{{ typeInfo.label }}</span>
-        </span>
+        <!-- Media Type & Offline Badge -->
+        <div class="flex items-center gap-1.5">
+          <span class="inline-flex items-center gap-1 rounded-lg bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white">
+            <UIcon :name="typeInfo.icon" class="h-3.5 w-3.5" />
+            <span>{{ typeInfo.label }}</span>
+          </span>
+
+          <span
+            v-if="item.id < 0"
+            class="inline-flex items-center gap-1 rounded-lg bg-amber-500/90 px-2 py-1 text-[10px] font-bold text-white shadow-sm"
+            title="Creato offline — in attesa di sincronizzazione cloud"
+          >
+            <UIcon name="i-lucide-cloud-upload" class="h-3 w-3" />
+            <span>Offline</span>
+          </span>
+        </div>
 
         <!-- Badges on right: Privacy & Favorite -->
         <div class="flex items-center gap-1.5">

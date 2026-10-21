@@ -1,6 +1,7 @@
 import type { Database } from '~/types/database.types'
 import type { FriendProfile, Friendship, MediaItem, Profile } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
+import { getAppCache, setAppCache } from '~/utils/offlineStorage'
 
 export function useFriends() {
   const supabase = useSupabaseClient<Database>()
@@ -21,6 +22,19 @@ export function useFriends() {
       return
     }
 
+    // Try reading cached friends first
+    const cached = await getAppCache<{
+      friends: FriendProfile[]
+      incoming: FriendProfile[]
+      outgoing: FriendProfile[]
+    }>(`friends_${id}`)
+
+    if (cached) {
+      friends.value = cached.friends || []
+      pendingIncoming.value = cached.incoming || []
+      pendingOutgoing.value = cached.outgoing || []
+    }
+
     loading.value = true
     try {
       // 1. Fetch all friendships involving this user
@@ -30,7 +44,7 @@ export function useFriends() {
         .or(`requester_id.eq.${id},addressee_id.eq.${id}`)
 
       if (friendshipsError) {
-        console.error('Error loading friendships:', friendshipsError)
+        console.warn('Network or error loading friendships:', friendshipsError)
         return
       }
 
@@ -39,6 +53,7 @@ export function useFriends() {
         friends.value = []
         pendingIncoming.value = []
         pendingOutgoing.value = []
+        await setAppCache(`friends_${id}`, { friends: [], incoming: [], outgoing: [] })
         return
       }
 
@@ -53,7 +68,7 @@ export function useFriends() {
         .in('id', uniqueIds)
 
       if (profilesError) {
-        console.error('Error loading friend profiles:', profilesError)
+        console.warn('Network or error loading friend profiles:', profilesError)
         return
       }
 
@@ -92,8 +107,14 @@ export function useFriends() {
       friends.value = acceptedList
       pendingIncoming.value = incomingList
       pendingOutgoing.value = outgoingList
+
+      await setAppCache(`friends_${id}`, {
+        friends: acceptedList,
+        incoming: incomingList,
+        outgoing: outgoingList
+      })
     } catch (err) {
-      console.error('Unexpected error loading friends:', err)
+      console.warn('Unexpected error loading friends (offline):', err)
     } finally {
       loading.value = false
     }

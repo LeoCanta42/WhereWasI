@@ -1,6 +1,7 @@
 import type { Database } from '~/types/database.types'
 import type { MediaActivity, Profile } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
+import { getAppCache, setAppCache } from '~/utils/offlineStorage'
 
 export function useActivityFeed() {
   const supabase = useSupabaseClient<Database>()
@@ -16,6 +17,12 @@ export function useActivityFeed() {
       return
     }
 
+    // Try reading cached activities first
+    const cached = await getAppCache<MediaActivity[]>(`feed_${id}`)
+    if (cached) {
+      activities.value = cached
+    }
+
     loading.value = true
     try {
       // 1. Fetch activities (RLS guarantees we only get self and friends non-private)
@@ -26,13 +33,14 @@ export function useActivityFeed() {
         .limit(40)
 
       if (error) {
-        console.error('Error loading activities:', error)
+        console.warn('Error loading activities (offline):', error)
         return
       }
 
       const raw = (data as unknown as MediaActivity[]) ?? []
       if (raw.length === 0) {
         activities.value = []
+        await setAppCache(`feed_${id}`, [])
         return
       }
 
@@ -52,8 +60,10 @@ export function useActivityFeed() {
         ...a,
         profile: profilesMap.get(a.user_id)
       }))
+
+      await setAppCache(`feed_${id}`, activities.value)
     } catch (err) {
-      console.error('Unexpected error loading activity feed:', err)
+      console.warn('Unexpected error loading activity feed (offline):', err)
     } finally {
       loading.value = false
     }

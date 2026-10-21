@@ -5,6 +5,9 @@ import { useAppearance } from '~/composables/useAppearance'
 import { useProfile } from '~/composables/useProfile'
 import { useAuth } from '~/composables/useAuth'
 import { usePwa } from '~/composables/usePwa'
+import { useOfflineSync } from '~/composables/useOfflineSync'
+import { useConfirm } from '~/composables/useConfirm'
+import { formatDate } from '~/utils/date'
 
 const props = defineProps<{
   open: boolean
@@ -19,6 +22,36 @@ const { theme, setTheme, setAccent } = useAppearance()
 const { profile, updateProfile } = useProfile()
 const { changePassword, logout } = useAuth()
 const { canInstall, isInstalled, install, needRefresh, updateApp, manualInstallHint, offlineReady } = usePwa()
+const { isOnline, isSyncing, pendingCount, lastSyncTime, syncNow, resetOfflineCache } = useOfflineSync()
+const { ask } = useConfirm()
+
+async function handleClearCache() {
+  const confirmed = await ask({
+    title: 'Svuotare la memoria locale?',
+    description: 'Verranno eliminati i dati salvati nella cache IndexedDB del dispositivo. I dati sul cloud rimarranno al sicuro.',
+    confirmLabel: 'Svuota cache',
+    tone: 'danger',
+    icon: 'i-lucide-trash-2'
+  })
+  if (confirmed) {
+    await resetOfflineCache()
+  }
+}
+
+const formattedLastSync = computed(() => {
+  if (!lastSyncTime.value) return 'Non ancora sincronizzato'
+  try {
+    const d = new Date(lastSyncTime.value)
+    return d.toLocaleDateString('it-IT', {
+      day: 'numeric',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return lastSyncTime.value
+  }
+})
 
 const displayName = ref('')
 const username = ref('')
@@ -310,6 +343,65 @@ async function handleChangePassword() {
             {{ isChangingPass ? 'Aggiornamento...' : 'Cambia Password' }}
           </button>
         </form>
+      </div>
+
+      <!-- Offline & Storage Section -->
+      <div class="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Archiviazione & Offline</h3>
+          <span
+            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold"
+            :class="isOnline
+              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+              : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'"
+          >
+            <UIcon :name="isOnline ? 'i-lucide-wifi' : 'i-lucide-wifi-off'" class="h-3 w-3" />
+            {{ isOnline ? 'Online' : 'Offline' }}
+          </span>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 space-y-3 dark:border-slate-800 dark:bg-slate-900/60">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2.5">
+              <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-sm">
+                <UIcon name="i-lucide-database" class="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-900 dark:text-white">Memoria Locale IndexedDB</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  <template v-if="pendingCount > 0">
+                    <span class="font-bold text-amber-600 dark:text-amber-400">{{ pendingCount }} {{ pendingCount === 1 ? 'modifica in attesa' : 'modifiche in attesa' }}</span>
+                  </template>
+                  <template v-else>
+                    Tutti i dati sono sincronizzati con il cloud
+                  </template>
+                </p>
+              </div>
+            </div>
+
+            <!-- Sync Now Button -->
+            <button
+              type="button"
+              :disabled="!isOnline || isSyncing"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50 dark:bg-indigo-500 dark:hover:bg-indigo-600"
+              @click="syncNow(true)"
+            >
+              <UIcon name="i-lucide-refresh-cw" class="h-3.5 w-3.5" :class="isSyncing ? 'animate-spin' : ''" />
+              <span>{{ isSyncing ? 'Sincronizzo...' : 'Sincronizza' }}</span>
+            </button>
+          </div>
+
+          <div class="flex items-center justify-between border-t border-slate-200/60 pt-2.5 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+            <span>Ultima sincronizzazione: <strong>{{ formattedLastSync }}</strong></span>
+            <button
+              type="button"
+              class="font-semibold text-rose-500 hover:text-rose-600 hover:underline dark:text-rose-400"
+              @click="handleClearCache"
+            >
+              Svuota cache
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- PWA & Mobile App Section -->

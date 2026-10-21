@@ -27,6 +27,35 @@ function handleSortChange(newSort: SortOptionId) {
   sortItems(newSort)
 }
 
+function toggleTopFilter(type: MediaType | 'all') {
+  if (type === 'all') {
+    if (activeType.value === 'all' && activeStatus.value === 'completed') {
+      activeStatus.value = 'in_progress'
+    } else {
+      activeType.value = 'all'
+      activeStatus.value = 'completed'
+    }
+    return
+  }
+
+  if (activeType.value === type) {
+    // Deselect back to all
+    activeType.value = 'all'
+    activeStatus.value = 'in_progress'
+  } else {
+    activeType.value = type
+    const hasInProgress = items.value.some((i) => i.media_type === type && i.status === 'in_progress')
+    const hasCompleted = items.value.some((i) => i.media_type === type && i.status === 'completed')
+    if (hasInProgress) {
+      activeStatus.value = 'in_progress'
+    } else if (hasCompleted) {
+      activeStatus.value = 'completed'
+    } else {
+      activeStatus.value = 'all'
+    }
+  }
+}
+
 const activeType = ref<MediaType | 'all'>('all')
 const activeStatus = ref<MediaStatus | 'all'>('in_progress')
 const searchQuery = ref('')
@@ -90,68 +119,96 @@ const filteredItems = computed(() => {
 <template>
   <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 space-y-6">
     <!-- Top Stats Overview Bar: Serie Viste, Film Visti, Libri Letti, Totale Opere -->
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
       <!-- Serie Viste -->
       <div
-        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-indigo-500/50 hover:shadow-sm dark:border-slate-800"
+        class="surface-card flex flex-col justify-between cursor-pointer rounded-2xl p-3 sm:p-4 border transition hover:shadow-sm"
+        :class="activeType === 'series'
+          ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/30 dark:bg-indigo-950/20'
+          : 'border-slate-200/70 hover:border-indigo-500/40 dark:border-slate-800'"
         title="Filtra per Serie TV"
-        @click="activeType = activeType === 'series' ? 'all' : 'series'"
+        @click="toggleTopFilter('series')"
       >
-        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Serie Viste</span>
-          <UIcon name="i-lucide-tv" class="h-4 w-4 text-indigo-500" />
+        <div class="flex items-center justify-between gap-1 text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span class="truncate">Serie Viste</span>
+          <UIcon name="i-lucide-tv" class="h-4 w-4 shrink-0 text-indigo-500" />
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.seriesCompleted }}</span>
-          <span class="text-xs text-slate-400">{{ stats.seriesWatching }} in corso</span>
+        <div class="mt-2">
+          <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-none">
+            {{ stats.seriesCompleted }}
+          </div>
+          <div class="mt-1 text-[10px] sm:text-xs text-slate-400 truncate leading-tight">
+            {{ stats.seriesWatching }} in corso
+          </div>
         </div>
       </div>
 
       <!-- Film Visti -->
       <div
-        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-amber-500/50 hover:shadow-sm dark:border-slate-800"
+        class="surface-card flex flex-col justify-between cursor-pointer rounded-2xl p-3 sm:p-4 border transition hover:shadow-sm"
+        :class="activeType === 'movie'
+          ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20'
+          : 'border-slate-200/70 hover:border-amber-500/40 dark:border-slate-800'"
         title="Filtra per Film"
-        @click="activeType = activeType === 'movie' ? 'all' : 'movie'"
+        @click="toggleTopFilter('movie')"
       >
-        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Film Visti</span>
-          <UIcon name="i-lucide-clapperboard" class="h-4 w-4 text-amber-500" />
+        <div class="flex items-center justify-between gap-1 text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span class="truncate">Film Visti</span>
+          <UIcon name="i-lucide-clapperboard" class="h-4 w-4 shrink-0 text-amber-500" />
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.moviesWatched }}</span>
-          <span class="text-xs text-slate-400">{{ stats.moviesPlanned }} da vedere</span>
+        <div class="mt-2">
+          <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-none">
+            {{ stats.moviesWatched }}
+          </div>
+          <div class="mt-1 text-[10px] sm:text-xs text-slate-400 truncate leading-tight">
+            {{ stats.moviesPlanned }} da vedere
+          </div>
         </div>
       </div>
 
       <!-- Libri Letti -->
       <div
-        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-emerald-500/50 hover:shadow-sm dark:border-slate-800"
+        class="surface-card flex flex-col justify-between cursor-pointer rounded-2xl p-3 sm:p-4 border transition hover:shadow-sm"
+        :class="activeType === 'book'
+          ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
+          : 'border-slate-200/70 hover:border-emerald-500/40 dark:border-slate-800'"
         title="Filtra per Libri"
-        @click="activeType = activeType === 'book' ? 'all' : 'book'"
+        @click="toggleTopFilter('book')"
       >
-        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Libri Letti</span>
-          <UIcon name="i-lucide-book-open" class="h-4 w-4 text-emerald-500" />
+        <div class="flex items-center justify-between gap-1 text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span class="truncate">Libri Letti</span>
+          <UIcon name="i-lucide-book-open" class="h-4 w-4 shrink-0 text-emerald-500" />
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.booksCompleted }}</span>
-          <span class="text-xs text-slate-400">{{ stats.booksReading }} in lettura</span>
+        <div class="mt-2">
+          <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-none">
+            {{ stats.booksCompleted }}
+          </div>
+          <div class="mt-1 text-[10px] sm:text-xs text-slate-400 truncate leading-tight">
+            {{ stats.booksReading }} in lettura
+          </div>
         </div>
       </div>
 
       <!-- Totale Completati -->
       <div
-        class="surface-card cursor-pointer rounded-2xl p-4 border border-slate-200/70 transition hover:border-purple-500/50 hover:shadow-sm dark:border-slate-800"
-        title="Mostra tutti gli elementi"
-        @click="activeType = 'all'; activeStatus = 'all'"
+        class="surface-card flex flex-col justify-between cursor-pointer rounded-2xl p-3 sm:p-4 border transition hover:shadow-sm"
+        :class="activeType === 'all' && activeStatus === 'completed'
+          ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/30 dark:bg-purple-950/20'
+          : 'border-slate-200/70 hover:border-purple-500/40 dark:border-slate-800'"
+        title="Filtra elementi completati"
+        @click="toggleTopFilter('all')"
       >
-        <div class="flex items-center justify-between text-xs font-semibold text-slate-500 dark:text-slate-400">
-          <span>Totale Completati</span>
-          <UIcon name="i-lucide-check-circle-2" class="h-4 w-4 text-purple-500" />
+        <div class="flex items-center justify-between gap-1 text-[11px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400">
+          <span class="truncate">Totale Completati</span>
+          <UIcon name="i-lucide-check-circle-2" class="h-4 w-4 shrink-0 text-purple-500" />
         </div>
-        <div class="mt-2 flex items-baseline gap-2">
-          <span class="text-2xl font-black text-slate-900 dark:text-white">{{ stats.completedCount }}</span>
-          <span class="text-xs text-slate-400">su {{ stats.total }} totali</span>
+        <div class="mt-2">
+          <div class="text-xl sm:text-2xl font-black text-slate-900 dark:text-white leading-none">
+            {{ stats.completedCount }}
+          </div>
+          <div class="mt-1 text-[10px] sm:text-xs text-slate-400 truncate leading-tight">
+            su {{ stats.total }} totali
+          </div>
         </div>
       </div>
     </div>

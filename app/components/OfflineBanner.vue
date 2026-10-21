@@ -70,7 +70,7 @@ const shouldShow = computed(() => {
         </div>
 
         <!-- Action Buttons -->
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 shrink-0">
           <button
             v-if="isOnline && pendingCount > 0 && !isSyncing"
             type="button"

@@ -24,12 +24,51 @@ export function useMediaTracker() {
   const toast = useToast()
   const { isOnline, refreshPendingCount, syncVersion } = useOfflineSync()
 
-  const items = useState<MediaItem[]>('media-items', () => [])
+  const items = useState<MediaItem[]>('media-items', () => {
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('where_was_i_items_snapshot')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed
+        }
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   const loading = useState<boolean>('media-items-loading', () => false)
-  const loaded = useState<boolean>('media-items-loaded', () => false)
+  const loaded = useState<boolean>('media-items-loaded', () => {
+    if (import.meta.client) {
+      try {
+        return Boolean(localStorage.getItem('where_was_i_items_snapshot'))
+      } catch {
+        return false
+      }
+    }
+    return false
+  })
 
-  // Reload when an offline sync completes
+  function persistItemsSnapshot(list: MediaItem[]) {
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('where_was_i_items_snapshot', JSON.stringify(list))
+      } catch (err) {
+        // ignore quota errors
+      }
+    }
+  }
+
+  // Keep local storage snapshot updated on every mutation
   if (import.meta.client) {
+    watch(items, (val) => {
+      if (Array.isArray(val)) {
+        persistItemsSnapshot(val)
+      }
+    }, { deep: true })
+
+    // Reload when an offline sync completes
     watch(syncVersion, async () => {
       await loadItems()
     })
@@ -55,6 +94,7 @@ export function useMediaTracker() {
         ...cached
       ]
       items.value = sortMediaItems(combined, prefs.value.sortBy)
+      persistItemsSnapshot(items.value)
       loaded.value = true
     }
 
@@ -80,6 +120,7 @@ export function useMediaTracker() {
         // Merge server items with any locally created items still waiting to sync
         const pendingOffline = items.value.filter((i) => i.id < 0)
         items.value = sortMediaItems([...pendingOffline, ...serverItems], prefs.value.sortBy)
+        persistItemsSnapshot(items.value)
       }
       loaded.value = true
     } catch (err: any) {

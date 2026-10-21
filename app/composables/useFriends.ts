@@ -8,10 +8,47 @@ export function useFriends() {
   const { userId, userEmail } = useCurrentUser()
   const toast = useToast()
 
-  const friends = useState<FriendProfile[]>('friends-list', () => [])
-  const pendingIncoming = useState<FriendProfile[]>('pending-incoming-friends', () => [])
+  const friends = useState<FriendProfile[]>('friends-list', () => {
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('where_was_i_friends_snapshot')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
+  const pendingIncoming = useState<FriendProfile[]>('pending-incoming-friends', () => {
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('where_was_i_incoming_snapshot')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) return parsed
+        }
+      } catch {
+        return []
+      }
+    }
+    return []
+  })
   const pendingOutgoing = useState<FriendProfile[]>('pending-outgoing-friends', () => [])
   const loading = useState<boolean>('friends-loading', () => false)
+
+  function persistFriendsSnapshot(fList: FriendProfile[], incList: FriendProfile[]) {
+    if (import.meta.client) {
+      try {
+        localStorage.setItem('where_was_i_friends_snapshot', JSON.stringify(fList))
+        localStorage.setItem('where_was_i_incoming_snapshot', JSON.stringify(incList))
+      } catch {
+        // ignore
+      }
+    }
+  }
 
   async function loadFriends() {
     const id = userId.value
@@ -33,6 +70,7 @@ export function useFriends() {
       friends.value = cached.friends || []
       pendingIncoming.value = cached.incoming || []
       pendingOutgoing.value = cached.outgoing || []
+      persistFriendsSnapshot(friends.value, pendingIncoming.value)
     }
 
     loading.value = true
@@ -107,6 +145,7 @@ export function useFriends() {
       friends.value = acceptedList
       pendingIncoming.value = incomingList
       pendingOutgoing.value = outgoingList
+      persistFriendsSnapshot(acceptedList, incomingList)
 
       await setAppCache(`friends_${id}`, {
         friends: acceptedList,

@@ -22,7 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const typeInfo = computed(() => getMediaTypeInfo(props.item.media_type))
-const statusInfo = computed(() => getMediaStatusInfo(props.item.status))
+const statusInfo = computed(() => getMediaStatusInfo(props.item.status, props.item.media_type))
 const progressPct = computed(() => calculateProgressPercentage(props.item))
 const progressText = computed(() => formatProgressDisplay(props.item))
 const shortProgressText = computed(() => formatProgressDisplay(props.item, true))

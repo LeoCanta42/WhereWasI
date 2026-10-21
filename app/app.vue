@@ -16,7 +16,7 @@ useSeoMeta({
   ogType: 'website'
 })
 
-const { user } = useAuth()
+const { user, userId } = useAuth()
 const { loadItems, items, addItem } = useMediaTracker()
 const { loadFriends, friends, pendingIncoming } = useFriends()
 const { status: approvalStatus, isApproved, isAdmin, loaded: profileLoaded, loadProfile, resetProfile } = useProfile()
@@ -66,11 +66,13 @@ watch(offlineReady, (val) => {
 // Workspace data loader
 watch(user, async (currentUser) => {
   if (!currentUser) {
-    items.value = []
-    friends.value = []
-    pendingIncoming.value = []
-    resetProfile()
-    isSettingsOpen.value = false
+    if (!userId.value) {
+      items.value = []
+      friends.value = []
+      pendingIncoming.value = []
+      resetProfile()
+      isSettingsOpen.value = false
+    }
     return
   }
 
@@ -83,6 +85,18 @@ watch(user, async (currentUser) => {
     ])
   }
 }, { immediate: true })
+
+onMounted(async () => {
+  if (userId.value) {
+    await loadProfile()
+    if (isApproved.value) {
+      await Promise.all([
+        loadItems(),
+        loadFriends()
+      ])
+    }
+  }
+})
 </script>
 
 <template>

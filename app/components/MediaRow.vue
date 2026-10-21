@@ -21,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const typeInfo = computed(() => getMediaTypeInfo(props.item.media_type))
-const statusInfo = computed(() => getMediaStatusInfo(props.item.status))
+const statusInfo = computed(() => getMediaStatusInfo(props.item.status, props.item.media_type))
 const progressPct = computed(() => calculateProgressPercentage(props.item))
 const progressText = computed(() => formatProgressDisplay(props.item, true))
 
@@ -100,7 +100,10 @@ const decrementTitle = computed(() => {
         </div>
 
         <div class="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span class="font-semibold text-indigo-600 dark:text-indigo-400">
+          <span
+            class="font-semibold"
+            :class="item.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'"
+          >
             {{ progressText }}
           </span>
           <span v-if="item.creator" class="hidden sm:inline truncate max-w-[150px]">• {{ item.creator }}</span>

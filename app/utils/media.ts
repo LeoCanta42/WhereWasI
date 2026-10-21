@@ -36,8 +36,22 @@ export function getMediaTypeInfo(type: MediaType): MediaTypeOption {
   return MEDIA_TYPES.find((t) => t.id === type) ?? (MEDIA_TYPES[0] as MediaTypeOption)
 }
 
-export function getMediaStatusInfo(status: MediaStatus): StatusOption {
-  return MEDIA_STATUSES.find((s) => s.id === status) ?? (MEDIA_STATUSES[0] as StatusOption)
+export function getMediaStatusInfo(status: MediaStatus, mediaType?: MediaType): StatusOption {
+  const base = MEDIA_STATUSES.find((s) => s.id === status) ?? (MEDIA_STATUSES[0] as StatusOption)
+  if (!mediaType) return base
+
+  if (mediaType === 'movie') {
+    if (status === 'completed') return { ...base, label: 'Visto' }
+    if (status === 'planned') return { ...base, label: 'Da Guardare' }
+    if (status === 'in_progress') return { ...base, label: 'In Visione' }
+  } else if (mediaType === 'book') {
+    if (status === 'completed') return { ...base, label: 'Letto' }
+    if (status === 'planned') return { ...base, label: 'Da Leggere' }
+    if (status === 'in_progress') return { ...base, label: 'In Lettura' }
+  } else if (mediaType === 'series') {
+    if (status === 'completed') return { ...base, label: 'Completata' }
+  }
+  return base
 }
 
 /**

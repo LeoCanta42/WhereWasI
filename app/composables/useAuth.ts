@@ -4,8 +4,7 @@ import { MIN_PASSWORD_LENGTH } from '~/utils/password'
 
 export function useAuth() {
   const supabase = useSupabaseClient<Database>()
-  const user = useSupabaseUser()
-  const { userEmail, clearFallbackUser } = useCurrentUser()
+  const { user, supabaseUser, userId, userEmail, isAuthenticated, clearFallbackUser } = useCurrentUser()
   const toast = useToast()
 
   const loading = ref(false)
@@ -170,6 +169,10 @@ export function useAuth() {
 
   return {
     user,
+    supabaseUser,
+    userId,
+    userEmail,
+    isAuthenticated,
     loading,
     loginWithEmail,
     signUpWithEmail,

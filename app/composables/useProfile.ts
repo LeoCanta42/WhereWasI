@@ -8,9 +8,42 @@ export function useProfile() {
   const { userId, userEmail } = useCurrentUser()
   const toast = useToast()
 
-  const profile = useState<Profile | null>('my-profile', () => null)
+  const profile = useState<Profile | null>('my-profile', () => {
+    if (import.meta.client) {
+      try {
+        const raw = localStorage.getItem('where_was_i_profile_snapshot')
+        if (raw) return JSON.parse(raw) as Profile
+      } catch {
+        return null
+      }
+    }
+    return null
+  })
   const loading = useState<boolean>('my-profile-loading', () => false)
-  const loaded = useState<boolean>('my-profile-loaded', () => false)
+  const loaded = useState<boolean>('my-profile-loaded', () => {
+    if (import.meta.client) {
+      try {
+        return Boolean(localStorage.getItem('where_was_i_profile_snapshot'))
+      } catch {
+        return false
+      }
+    }
+    return false
+  })
+
+  function persistProfileSnapshot(p: Profile | null) {
+    if (import.meta.client) {
+      try {
+        if (p) {
+          localStorage.setItem('where_was_i_profile_snapshot', JSON.stringify(p))
+        } else {
+          localStorage.removeItem('where_was_i_profile_snapshot')
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
 
   const isAdmin = computed(() => Boolean(profile.value?.is_admin))
 
@@ -35,6 +68,7 @@ export function useProfile() {
     if (cached) {
       profile.value = cached
       loaded.value = true
+      persistProfileSnapshot(cached)
     }
 
     loading.value = true
@@ -62,6 +96,7 @@ export function useProfile() {
         }
       } else if (data) {
         profile.value = data as Profile
+        persistProfileSnapshot(profile.value)
         await setAppCache(`profile_${id}`, data)
       } else {
         // Create initial profile row waiting for approval
@@ -91,6 +126,7 @@ export function useProfile() {
           }
         } else if (inserted) {
           profile.value = inserted as Profile
+          persistProfileSnapshot(profile.value)
           await setAppCache(`profile_${id}`, inserted)
         }
       }
@@ -125,6 +161,7 @@ export function useProfile() {
         ...profile.value,
         ...updates
       }
+      persistProfileSnapshot(profile.value)
       await setAppCache(`profile_${id}`, profile.value)
     }
 
@@ -184,6 +221,7 @@ export function useProfile() {
   function resetProfile() {
     profile.value = null
     loaded.value = false
+    persistProfileSnapshot(null)
   }
 
   return {

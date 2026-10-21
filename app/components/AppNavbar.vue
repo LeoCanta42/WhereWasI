@@ -5,7 +5,6 @@ import { useAppearance } from '~/composables/useAppearance'
 import { useFriends } from '~/composables/useFriends'
 import { useQuickAdd } from '~/composables/useQuickAdd'
 import { usePwa } from '~/composables/usePwa'
-import { useOfflineSync } from '~/composables/useOfflineSync'
 
 const props = defineProps<{
   user: any
@@ -23,7 +22,6 @@ const { theme, setTheme, isDark } = useAppearance()
 const { pendingIncoming, friends } = useFriends()
 const { openQuickAdd } = useQuickAdd()
 const { canInstall, isInstalled, install, needRefresh, updateApp } = usePwa()
-const { isOnline, isSyncing, pendingCount, syncNow } = useOfflineSync()
 
 const incomingCount = computed(() => pendingIncoming.value.length)
 
@@ -92,45 +90,6 @@ const avatarInitial = computed(() => {
 
       <!-- Actions -->
       <div class="flex items-center gap-2">
-        <!-- Offline & Sync Status Pill -->
-        <div
-          v-if="!isOnline"
-          class="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-xs font-bold text-amber-700 dark:border-amber-500/20 dark:bg-amber-950/40 dark:text-amber-300"
-          title="Applicazione offline — Le modifiche vengono salvate nella memoria locale"
-        >
-          <UIcon name="i-lucide-wifi-off" class="h-3.5 w-3.5" />
-          <span class="hidden sm:inline">Offline</span>
-          <span
-            v-if="pendingCount > 0"
-            class="flex h-4 min-w-4 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white"
-          >
-            {{ pendingCount }}
-          </span>
-        </div>
-
-        <div
-          v-else-if="isSyncing"
-          class="inline-flex items-center gap-1.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-1.5 text-xs font-bold text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-950/40 dark:text-indigo-300"
-          title="Sincronizzazione modifiche in corso..."
-        >
-          <UIcon name="i-lucide-refresh-cw" class="h-3.5 w-3.5 animate-spin" />
-          <span class="hidden sm:inline">Sincronizzo...</span>
-        </div>
-
-        <button
-          v-else-if="pendingCount > 0"
-          type="button"
-          class="inline-flex items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-500/20 active:scale-95 dark:border-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300"
-          title="Tornato online: clicca per sincronizzare subito le modifiche"
-          @click="syncNow(true)"
-        >
-          <UIcon name="i-lucide-cloud-upload" class="h-3.5 w-3.5" />
-          <span class="hidden sm:inline">Sincronizza</span>
-          <span class="flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">
-            {{ pendingCount }}
-          </span>
-        </button>
-
         <!-- New PWA Version Available Button -->
         <button
           v-if="needRefresh"

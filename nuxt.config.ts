@@ -69,8 +69,7 @@ export default defineNuxtConfig({
     registerType: 'autoUpdate',
     registerWebManifestInRouteRules: true,
     devOptions: {
-      enabled: true,
-      type: 'module',
+      enabled: false,
       suppressWarnings: true
     },
     client: {
@@ -105,7 +104,7 @@ export default defineNuxtConfig({
       launch_handler: { client_mode: 'navigate-existing' }
     },
     workbox: {
-      globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+      globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
       globIgnores: ['**/screenshots/**', '**/splash/**'],
       navigateFallback: '/',
       navigateFallbackDenylist: [/^\/api/],
@@ -120,10 +119,10 @@ export default defineNuxtConfig({
           handler: 'NetworkFirst',
           options: {
             cacheName: 'pages',
-            networkTimeoutSeconds: 3,
+            networkTimeoutSeconds: 5,
             expiration: {
-              maxEntries: 30,
-              maxAgeSeconds: 60 * 60 * 24 * 30
+              maxEntries: 20,
+              maxAgeSeconds: 60 * 60 * 24
             }
           }
         },

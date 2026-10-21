@@ -21,7 +21,7 @@ const emit = defineEmits<{
 }>()
 
 const typeInfo = computed(() => getMediaTypeInfo(props.item.media_type))
-const statusInfo = computed(() => getMediaStatusInfo(props.item.status, props.item.media_type))
+const statusInfo = computed(() => getMediaStatusInfo(props.item.status))
 const progressPct = computed(() => calculateProgressPercentage(props.item))
 const progressText = computed(() => formatProgressDisplay(props.item, true))
 
@@ -87,23 +87,12 @@ const decrementTitle = computed(() => {
           <h3 class="truncate text-sm font-bold text-slate-900 dark:text-white">
             {{ item.title }}
           </h3>
-          <span
-            v-if="item.id < 0"
-            class="inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300"
-            title="Creato offline — in attesa di sincronizzazione cloud"
-          >
-            <UIcon name="i-lucide-cloud-upload" class="h-3 w-3" />
-            <span class="hidden sm:inline">Offline</span>
-          </span>
           <UIcon v-if="item.is_favorite" name="i-lucide-star" class="h-3.5 w-3.5 flex-shrink-0 fill-amber-400 text-amber-400" />
           <UIcon v-if="item.is_private" name="i-lucide-lock" class="h-3 w-3 flex-shrink-0 text-slate-400" />
         </div>
 
         <div class="mt-1 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-          <span
-            class="font-semibold"
-            :class="item.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'"
-          >
+          <span class="font-semibold text-indigo-600 dark:text-indigo-400">
             {{ progressText }}
           </span>
           <span v-if="item.creator" class="hidden sm:inline truncate max-w-[150px]">• {{ item.creator }}</span>

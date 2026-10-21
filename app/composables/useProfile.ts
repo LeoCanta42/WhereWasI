@@ -1,49 +1,15 @@
 import type { Database } from '~/types/database.types'
 import type { ApprovalStatus, Profile } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
-import { getAppCache, setAppCache } from '~/utils/offlineStorage'
 
 export function useProfile() {
   const supabase = useSupabaseClient<Database>()
   const { userId, userEmail } = useCurrentUser()
   const toast = useToast()
 
-  const profile = useState<Profile | null>('my-profile', () => {
-    if (import.meta.client) {
-      try {
-        const raw = localStorage.getItem('where_was_i_profile_snapshot')
-        if (raw) return JSON.parse(raw) as Profile
-      } catch {
-        return null
-      }
-    }
-    return null
-  })
+  const profile = useState<Profile | null>('my-profile', () => null)
   const loading = useState<boolean>('my-profile-loading', () => false)
-  const loaded = useState<boolean>('my-profile-loaded', () => {
-    if (import.meta.client) {
-      try {
-        return Boolean(localStorage.getItem('where_was_i_profile_snapshot'))
-      } catch {
-        return false
-      }
-    }
-    return false
-  })
-
-  function persistProfileSnapshot(p: Profile | null) {
-    if (import.meta.client) {
-      try {
-        if (p) {
-          localStorage.setItem('where_was_i_profile_snapshot', JSON.stringify(p))
-        } else {
-          localStorage.removeItem('where_was_i_profile_snapshot')
-        }
-      } catch {
-        // ignore
-      }
-    }
-  }
+  const loaded = useState<boolean>('my-profile-loaded', () => false)
 
   const isAdmin = computed(() => Boolean(profile.value?.is_admin))
 
@@ -63,14 +29,6 @@ export function useProfile() {
       return
     }
 
-    // Try reading cached profile first for instant rendering & offline usage
-    const cached = await getAppCache<Profile>(`profile_${id}`)
-    if (cached) {
-      profile.value = cached
-      loaded.value = true
-      persistProfileSnapshot(cached)
-    }
-
     loading.value = true
     try {
       const { data, error } = await supabase
@@ -80,24 +38,14 @@ export function useProfile() {
         .maybeSingle()
 
       if (error) {
-        // If offline or network error and we already have cached profile, proceed gracefully
-        const isNetworkError = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')
-        if (isNetworkError && profile.value) {
-          console.warn('[useProfile] Offline: using cached profile')
-        } else {
-          console.error('Error loading profile:', error)
-          if (!profile.value) {
-            toast.add({
-              title: 'Errore caricamento profilo',
-              description: error.message,
-              color: 'error'
-            })
-          }
-        }
+        console.error('Error loading profile:', error)
+        toast.add({
+          title: 'Errore caricamento profilo',
+          description: error.message,
+          color: 'error'
+        })
       } else if (data) {
         profile.value = data as Profile
-        persistProfileSnapshot(profile.value)
-        await setAppCache(`profile_${id}`, data)
       } else {
         // Create initial profile row waiting for approval
         const defaultProfile: Partial<Profile> = {
@@ -109,42 +57,26 @@ export function useProfile() {
           approved: false,
           is_admin: false
         }
-        const { data: inserted, error: insertError } = await supabase
-          .from('profiles')
-          .insert(defaultProfile as any)
-          .select()
-          .single()
-
+        const { data: inserted, error: insertError } = await supabase.from('profiles').insert(defaultProfile as any).select().single()
         if (insertError) {
           console.error('Error creating default profile:', insertError)
-          if (!profile.value) {
-            toast.add({
-              title: 'Errore creazione profilo',
-              description: insertError.message,
-              color: 'error'
-            })
-          }
+          toast.add({
+            title: 'Errore creazione profilo',
+            description: insertError.message,
+            color: 'error'
+          })
         } else if (inserted) {
           profile.value = inserted as Profile
-          persistProfileSnapshot(profile.value)
-          await setAppCache(`profile_${id}`, inserted)
         }
       }
       loaded.value = true
     } catch (err: any) {
-      const isNetworkError = err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')
-      if (isNetworkError && profile.value) {
-        console.warn('[useProfile] Offline exception: continuing with cached profile')
-      } else {
-        console.error('Unexpected error loading profile:', err)
-        if (!profile.value) {
-          toast.add({
-            title: 'Errore imprevisto profilo',
-            description: err?.message || 'Si è verificato un errore durante il caricamento del profilo.',
-            color: 'error'
-          })
-        }
-      }
+      console.error('Unexpected error loading profile:', err)
+      toast.add({
+        title: 'Errore imprevisto profilo',
+        description: err?.message || 'Si è verificato un errore durante il caricamento del profilo.',
+        color: 'error'
+      })
       loaded.value = true
     } finally {
       loading.value = false
@@ -155,16 +87,6 @@ export function useProfile() {
     const id = userId.value
     if (!id) return false
 
-    // Optimistic update locally
-    if (profile.value) {
-      profile.value = {
-        ...profile.value,
-        ...updates
-      }
-      persistProfileSnapshot(profile.value)
-      await setAppCache(`profile_${id}`, profile.value)
-    }
-
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -174,15 +96,6 @@ export function useProfile() {
         .single()
 
       if (error) {
-        const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')
-        if (isNetwork) {
-          toast.add({
-            title: 'Profilo aggiornato offline',
-            description: 'Le modifiche al profilo verranno sincronizzate non appena tornerai online.',
-            color: 'info'
-          })
-          return true
-        }
         toast.add({
           title: 'Errore',
           description: error.message.includes('unique') ? 'Nome utente già in uso' : error.message,
@@ -192,23 +105,13 @@ export function useProfile() {
       }
 
       profile.value = data as Profile
-      await setAppCache(`profile_${id}`, data)
       toast.add({
         title: 'Profilo salvato',
         description: 'Le modifiche sono state salvate.',
         color: 'success'
       })
       return true
-    } catch (err: any) {
-      const isNetwork = err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError')
-      if (isNetwork) {
-        toast.add({
-          title: 'Profilo aggiornato offline',
-          description: 'Le modifiche al profilo verranno sincronizzate non appena tornerai online.',
-          color: 'info'
-        })
-        return true
-      }
+    } catch (err) {
       console.error('Error updating profile:', err)
       return false
     }
@@ -221,7 +124,6 @@ export function useProfile() {
   function resetProfile() {
     profile.value = null
     loaded.value = false
-    persistProfileSnapshot(null)
   }
 
   return {

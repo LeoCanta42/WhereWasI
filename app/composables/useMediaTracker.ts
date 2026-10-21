@@ -1,15 +1,7 @@
 import type { Database } from '~/types/database.types'
-import type { MediaItem, MediaActivity, MediaStatus, MediaType, ProgressType } from '~/types'
+import type { MediaItem, MediaStatus, MediaType, ProgressType } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
 import { usePreferences, type SortOptionId } from '~/composables/usePreferences'
-import { useOfflineSync } from '~/composables/useOfflineSync'
-import {
-  getCachedMediaItems,
-  saveCachedMediaItems,
-  saveCachedMediaItem,
-  removeCachedMediaItem,
-  enqueueMutation
-} from '~/utils/offlineStorage'
 import {
   formatProgressDisplay,
   getEpisodesForSeason,
@@ -22,57 +14,10 @@ export function useMediaTracker() {
   const supabase = useSupabaseClient<Database>()
   const { userId } = useCurrentUser()
   const toast = useToast()
-  const { isOnline, refreshPendingCount, syncVersion } = useOfflineSync()
 
-  const items = useState<MediaItem[]>('media-items', () => {
-    if (import.meta.client) {
-      try {
-        const raw = localStorage.getItem('where_was_i_items_snapshot')
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed
-        }
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+  const items = useState<MediaItem[]>('media-items', () => [])
   const loading = useState<boolean>('media-items-loading', () => false)
-  const loaded = useState<boolean>('media-items-loaded', () => {
-    if (import.meta.client) {
-      try {
-        return Boolean(localStorage.getItem('where_was_i_items_snapshot'))
-      } catch {
-        return false
-      }
-    }
-    return false
-  })
-
-  function persistItemsSnapshot(list: MediaItem[]) {
-    if (import.meta.client) {
-      try {
-        localStorage.setItem('where_was_i_items_snapshot', JSON.stringify(list))
-      } catch (err) {
-        // ignore quota errors
-      }
-    }
-  }
-
-  // Keep local storage snapshot updated on every mutation
-  if (import.meta.client) {
-    watch(items, (val) => {
-      if (Array.isArray(val)) {
-        persistItemsSnapshot(val)
-      }
-    }, { deep: true })
-
-    // Reload when an offline sync completes
-    watch(syncVersion, async () => {
-      await loadItems()
-    })
-  }
+  const loaded = useState<boolean>('media-items-loaded', () => false)
 
   async function loadItems() {
     const id = userId.value
@@ -80,22 +25,6 @@ export function useMediaTracker() {
       items.value = []
       loaded.value = false
       return
-    }
-
-    // 1. Instant load from local IndexedDB cache
-    const { prefs } = usePreferences()
-    const cached = await getCachedMediaItems(id)
-    if (cached && cached.length > 0) {
-      // Keep any pending offline-created items (id < 0) that are currently in memory
-      const pendingOffline = items.value.filter((i) => i.id < 0)
-      const cachedIds = new Set(cached.map((c) => c.id))
-      const combined = [
-        ...pendingOffline.filter((p) => !cachedIds.has(p.id)),
-        ...cached
-      ]
-      items.value = sortMediaItems(combined, prefs.value.sortBy)
-      persistItemsSnapshot(items.value)
-      loaded.value = true
     }
 
     loading.value = true
@@ -106,25 +35,14 @@ export function useMediaTracker() {
         .eq('user_id', id)
 
       if (error) {
-        const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')
-        if (!isNetwork) {
-          console.error('Error loading media items:', error)
-        } else {
-          console.warn('[useMediaTracker] Network unavailable: using cached items.')
-        }
-      } else if (data) {
-        const serverItems = (data as unknown as MediaItem[]) ?? []
-        // Persist fresh server items in IndexedDB
-        await saveCachedMediaItems(serverItems)
-
-        // Merge server items with any locally created items still waiting to sync
-        const pendingOffline = items.value.filter((i) => i.id < 0)
-        items.value = sortMediaItems([...pendingOffline, ...serverItems], prefs.value.sortBy)
-        persistItemsSnapshot(items.value)
+        console.error('Error loading media items:', error)
+      } else {
+        const { prefs } = usePreferences()
+        items.value = sortMediaItems((data as unknown as MediaItem[]) ?? [], prefs.value.sortBy)
       }
       loaded.value = true
-    } catch (err: any) {
-      console.warn('[useMediaTracker] Error or offline while loading items:', err)
+    } catch (err) {
+      console.error('Unexpected error loading media items:', err)
       loaded.value = true
     } finally {
       loading.value = false
@@ -135,115 +53,83 @@ export function useMediaTracker() {
     const id = userId.value
     if (!id) return null
 
-    const nowIso = new Date().toISOString()
-    const row = {
-      ...payload,
-      user_id: id,
-      started_at: payload.started_at ?? (payload.status !== 'planned' ? nowIso : null),
-      completed_at: payload.completed_at ?? (payload.status === 'completed' ? nowIso : null),
-      updated_at: nowIso
-    }
-
-    // Attempt online insert if online
-    if (isOnline.value) {
-      try {
-        const { data, error } = await supabase
-          .from('media_items')
-          .insert(row as any)
-          .select()
-          .single()
-
-        if (error) {
-          const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')
-          if (!isNetwork) {
-            toast.add({
-              title: 'Errore',
-              description: error.message,
-              color: 'error'
-            })
-            return null
-          }
-          // Fall through to offline handling
-        } else if (data) {
-          const newItem = data as unknown as MediaItem
-          items.value = [newItem, ...items.value]
-          await saveCachedMediaItem(newItem)
-
-          // Determine activity action type & message based on status
-          let actionType: MediaActivity['action_type'] = 'started'
-          let message = `Ha iniziato a seguire "${newItem.title}"`
-
-          if (newItem.status === 'completed') {
-            actionType = 'completed'
-            if (newItem.media_type === 'movie') message = `Ha visto il film "${newItem.title}"! 🎬`
-            else if (newItem.media_type === 'book') message = `Ha finito di leggere "${newItem.title}"! 📚`
-            else if (newItem.media_type === 'series') message = `Ha completato la serie "${newItem.title}"! 🍿`
-            else message = `Ha completato "${newItem.title}"! 🎉`
-          } else if (newItem.status === 'planned') {
-            actionType = 'status_changed'
-            if (newItem.media_type === 'movie') message = `Ha aggiunto "${newItem.title}" ai film da vedere`
-            else if (newItem.media_type === 'book') message = `Ha aggiunto "${newItem.title}" ai libri da leggere`
-            else message = `Ha aggiunto "${newItem.title}" alla lista da iniziare`
-          }
-
-          // Log activity (best effort)
-          try {
-            await supabase.from('media_activities').insert({
-              user_id: id,
-              media_item_id: newItem.id,
-              media_title: newItem.title,
-              media_type: newItem.media_type,
-              action_type: actionType,
-              progress_text: formatProgressDisplay(newItem, true),
-              message,
-              is_private: newItem.is_private
-            } as any)
-          } catch {
-            // activity logging failure should not block user
-          }
-
-          toast.add({
-            title: 'Elemento aggiunto!',
-            description: `"${newItem.title}" è stato aggiunto alla tua lista.`,
-            color: 'success'
-          })
-
-          return newItem
-        }
-      } catch (err: any) {
-        console.warn('[useMediaTracker] Online insert failed, falling back to offline:', err)
+    try {
+      const nowIso = new Date().toISOString()
+      const row = {
+        ...payload,
+        user_id: id,
+        started_at: payload.started_at ?? (payload.status !== 'planned' ? nowIso : null),
+        completed_at: payload.completed_at ?? (payload.status === 'completed' ? nowIso : null),
+        updated_at: nowIso
       }
+
+      const { data, error } = await supabase
+        .from('media_items')
+        .insert(row as any)
+        .select()
+        .single()
+
+      if (error) {
+        toast.add({
+          title: 'Errore',
+          description: error.message,
+          color: 'error'
+        })
+        return null
+      }
+
+      const newItem = data as unknown as MediaItem
+      items.value = [newItem, ...items.value]
+
+      // Determine activity action type & message based on status
+      let actionType: MediaActivity['action_type'] = 'started'
+      let message = `Ha iniziato a seguire "${newItem.title}"`
+
+      if (newItem.status === 'completed') {
+        actionType = 'completed'
+        if (newItem.media_type === 'movie') {
+          message = `Ha visto il film "${newItem.title}"! 🎬`
+        } else if (newItem.media_type === 'book') {
+          message = `Ha finito di leggere "${newItem.title}"! 📚`
+        } else if (newItem.media_type === 'series') {
+          message = `Ha completato la serie "${newItem.title}"! 🍿`
+        } else {
+          message = `Ha completato "${newItem.title}"! 🎉`
+        }
+      } else if (newItem.status === 'planned') {
+        actionType = 'status_changed'
+        if (newItem.media_type === 'movie') {
+          message = `Ha aggiunto "${newItem.title}" ai film da vedere`
+        } else if (newItem.media_type === 'book') {
+          message = `Ha aggiunto "${newItem.title}" ai libri da leggere`
+        } else {
+          message = `Ha aggiunto "${newItem.title}" alla lista da iniziare`
+        }
+      }
+
+      // Log activity
+      await supabase.from('media_activities').insert({
+        user_id: id,
+        media_item_id: newItem.id,
+        media_title: newItem.title,
+        media_type: newItem.media_type,
+        action_type: actionType,
+        progress_text: formatProgressDisplay(newItem, true),
+        message,
+        is_private: newItem.is_private
+      } as any)
+
+      toast.add({
+        title: 'Elemento aggiunto!',
+        description: `"${newItem.title}" è stato aggiunto alla tua lista.`,
+        color: 'success'
+      })
+
+      return newItem
+    } catch (err) {
+      console.error('Error adding media item:', err)
+      return null
     }
-
-    // Offline creation path: assign a negative client ID
-    const tempId = -Math.floor(Date.now() + Math.random() * 1000)
-    const offlineItem: MediaItem = {
-      ...row,
-      id: tempId,
-      created_at: nowIso,
-      updated_at: nowIso
-    } as MediaItem
-
-    // Optimistically update memory and offline storage
-    items.value = [offlineItem, ...items.value]
-    await saveCachedMediaItem(offlineItem)
-
-    await enqueueMutation({
-      action: 'insert',
-      item_id: tempId,
-      tempId,
-      payload: row,
-      timestamp: Date.now()
-    })
-    await refreshPendingCount()
-
-    toast.add({
-      title: 'Elemento salvato offline! 💾',
-      description: `"${offlineItem.title}" è stato salvato sul dispositivo. Verrà sincronizzato non appena tornerai online.`,
-      color: 'warning'
-    })
-
-    return offlineItem
   }
 
   async function updateItem(id: number, updates: Partial<MediaItem>): Promise<boolean> {
@@ -253,199 +139,116 @@ export function useMediaTracker() {
     const oldIndex = items.value.findIndex((i) => i.id === id)
     const oldItem = oldIndex !== -1 ? items.value[oldIndex] : null
 
-    const payload = {
-      ...updates,
-      updated_at: new Date().toISOString()
-    }
-
-    // Optimistically update memory
-    const updated = {
-      ...(oldItem || {}),
-      ...payload
-    } as MediaItem
-
-    if (oldIndex !== -1) {
-      items.value.splice(oldIndex, 1, updated)
-    }
-
-    // Save to local cache immediately
-    await saveCachedMediaItem(updated)
-
-    // If item was created offline (negative ID), update offline mutation
-    if (id < 0) {
-      await enqueueMutation({
-        action: 'update',
-        item_id: id,
-        payload: updates,
-        timestamp: Date.now()
-      })
-      await refreshPendingCount()
-      return true
-    }
-
-    // If online, try sending to Supabase
-    if (isOnline.value) {
-      try {
-        const { data, error } = await supabase
-          .from('media_items')
-          .update(payload as any)
-          .eq('id', id)
-          .select()
-          .single()
-
-        if (error) {
-          const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')
-          if (!isNetwork) {
-            toast.add({
-              title: 'Errore durante l\'aggiornamento',
-              description: error.message,
-              color: 'error'
-            })
-            return false
-          }
-          // Fall through to offline queue
-        } else if (data) {
-          const serverUpdated = data as unknown as MediaItem
-          if (oldIndex !== -1) {
-            items.value.splice(oldIndex, 1, serverUpdated)
-          }
-          await saveCachedMediaItem(serverUpdated)
-
-          // Activity logging
-          if (oldItem) {
-            const isProgressChanged =
-              oldItem.episode !== serverUpdated.episode ||
-              oldItem.season !== serverUpdated.season ||
-              oldItem.current_page !== serverUpdated.current_page ||
-              oldItem.percentage !== serverUpdated.percentage ||
-              oldItem.time_stopped !== serverUpdated.time_stopped ||
-              oldItem.current_unit !== serverUpdated.current_unit
-            const isStatusChanged = oldItem.status !== serverUpdated.status
-            const isCompleted = serverUpdated.status === 'completed' && oldItem.status !== 'completed'
-
-            try {
-              if (isCompleted) {
-                await supabase.from('media_activities').insert({
-                  user_id: currentUserId,
-                  media_item_id: serverUpdated.id,
-                  media_title: serverUpdated.title,
-                  media_type: serverUpdated.media_type,
-                  action_type: 'completed',
-                  progress_text: formatProgressDisplay(serverUpdated, true),
-                  message: `Ha completato "${serverUpdated.title}"! 🎉`,
-                  is_private: serverUpdated.is_private
-                } as any)
-              } else if (isStatusChanged) {
-                await supabase.from('media_activities').insert({
-                  user_id: currentUserId,
-                  media_item_id: serverUpdated.id,
-                  media_title: serverUpdated.title,
-                  media_type: serverUpdated.media_type,
-                  action_type: 'status_changed',
-                  progress_text: formatProgressDisplay(serverUpdated, true),
-                  message: `Ha aggiornato lo stato di "${serverUpdated.title}"`,
-                  is_private: serverUpdated.is_private
-                } as any)
-              } else if (isProgressChanged) {
-                await supabase.from('media_activities').insert({
-                  user_id: currentUserId,
-                  media_item_id: serverUpdated.id,
-                  media_title: serverUpdated.title,
-                  media_type: serverUpdated.media_type,
-                  action_type: 'progress_updated',
-                  progress_text: formatProgressDisplay(serverUpdated, true),
-                  message: `È arrivato a ${formatProgressDisplay(serverUpdated, true)} di "${serverUpdated.title}"`,
-                  is_private: serverUpdated.is_private
-                } as any)
-              }
-            } catch {
-              // Ignore activity errors
-            }
-          }
-
-          return true
-        }
-      } catch (err) {
-        console.warn('[useMediaTracker] Online update failed, enqueueing offline:', err)
+    try {
+      const payload = {
+        ...updates,
+        updated_at: new Date().toISOString()
       }
-    }
 
-    // Offline queue path
-    await enqueueMutation({
-      action: 'update',
-      item_id: id,
-      payload: updates,
-      timestamp: Date.now()
-    })
-    await refreshPendingCount()
-    return true
+      const { data, error } = await supabase
+        .from('media_items')
+        .update(payload as any)
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) {
+        toast.add({
+          title: 'Errore durante l\'aggiornamento',
+          description: error.message,
+          color: 'error'
+        })
+        return false
+      }
+
+      const updated = data as unknown as MediaItem
+      if (oldIndex !== -1) {
+        // Keep item in its exact position so it stays still
+        items.value.splice(oldIndex, 1, updated)
+      }
+
+      // Check if progress or status changed to log activity
+      if (oldItem) {
+        const isProgressChanged =
+          oldItem.episode !== updated.episode ||
+          oldItem.season !== updated.season ||
+          oldItem.current_page !== updated.current_page ||
+          oldItem.percentage !== updated.percentage ||
+          oldItem.time_stopped !== updated.time_stopped ||
+          oldItem.current_unit !== updated.current_unit
+        const isStatusChanged = oldItem.status !== updated.status
+        const isCompleted = updated.status === 'completed' && oldItem.status !== 'completed'
+
+        if (isCompleted) {
+          await supabase.from('media_activities').insert({
+            user_id: currentUserId,
+            media_item_id: updated.id,
+            media_title: updated.title,
+            media_type: updated.media_type,
+            action_type: 'completed',
+            progress_text: formatProgressDisplay(updated, true),
+            message: `Ha completato "${updated.title}"! 🎉`,
+            is_private: updated.is_private
+          } as any)
+        } else if (isStatusChanged) {
+          await supabase.from('media_activities').insert({
+            user_id: currentUserId,
+            media_item_id: updated.id,
+            media_title: updated.title,
+            media_type: updated.media_type,
+            action_type: 'status_changed',
+            progress_text: formatProgressDisplay(updated, true),
+            message: `Ha aggiornato lo stato di "${updated.title}"`,
+            is_private: updated.is_private
+          } as any)
+        } else if (isProgressChanged) {
+          await supabase.from('media_activities').insert({
+            user_id: currentUserId,
+            media_item_id: updated.id,
+            media_title: updated.title,
+            media_type: updated.media_type,
+            action_type: 'progress_updated',
+            progress_text: formatProgressDisplay(updated, true),
+            message: `È arrivato a ${formatProgressDisplay(updated, true)} di "${updated.title}"`,
+            is_private: updated.is_private
+          } as any)
+        }
+      }
+
+      return true
+    } catch (err) {
+      console.error('Error updating media item:', err)
+      return false
+    }
   }
 
   async function deleteItem(id: number): Promise<boolean> {
-    // Optimistic removal from state and local storage
-    items.value = items.value.filter((i) => i.id !== id)
-    await removeCachedMediaItem(id)
+    try {
+      const { error } = await supabase
+        .from('media_items')
+        .delete()
+        .eq('id', id)
 
-    // Offline-created item: delete local mutation, nothing needed on server
-    if (id < 0) {
-      await enqueueMutation({
-        action: 'delete',
-        item_id: id,
-        timestamp: Date.now()
-      })
-      await refreshPendingCount()
+      if (error) {
+        toast.add({
+          title: 'Errore',
+          description: error.message,
+          color: 'error'
+        })
+        return false
+      }
+
+      items.value = items.value.filter((i) => i.id !== id)
       toast.add({
-        title: 'Elemento eliminato (offline)',
-        description: 'L\'elemento è stato rimosso dalla memoria locale.',
+        title: 'Elemento eliminato',
+        description: 'L\'elemento è stato rimosso dalla tua lista.',
         color: 'neutral'
       })
       return true
+    } catch (err) {
+      console.error('Error deleting media item:', err)
+      return false
     }
-
-    if (isOnline.value) {
-      try {
-        const { error } = await supabase
-          .from('media_items')
-          .delete()
-          .eq('id', id)
-
-        if (error) {
-          const isNetwork = error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')
-          if (!isNetwork) {
-            toast.add({
-              title: 'Errore',
-              description: error.message,
-              color: 'error'
-            })
-            return false
-          }
-          // Fall through to offline queue
-        } else {
-          toast.add({
-            title: 'Elemento eliminato',
-            description: 'L\'elemento è stato rimosso dalla tua lista.',
-            color: 'neutral'
-          })
-          return true
-        }
-      } catch (err) {
-        console.warn('[useMediaTracker] Online delete failed, enqueueing offline:', err)
-      }
-    }
-
-    await enqueueMutation({
-      action: 'delete',
-      item_id: id,
-      timestamp: Date.now()
-    })
-    await refreshPendingCount()
-
-    toast.add({
-      title: 'Elemento eliminato (offline)',
-      description: 'La rimozione verrà sincronizzata sul cloud appena tornerai online.',
-      color: 'neutral'
-    })
-    return true
   }
 
   /**
@@ -707,3 +510,4 @@ export function useMediaTracker() {
     sortItems
   }
 }
+

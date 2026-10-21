@@ -16,7 +16,7 @@ useSeoMeta({
   ogType: 'website'
 })
 
-const { user, userId } = useAuth()
+const { user } = useAuth()
 const { loadItems, items, addItem } = useMediaTracker()
 const { loadFriends, friends, pendingIncoming } = useFriends()
 const { status: approvalStatus, isApproved, isAdmin, loaded: profileLoaded, loadProfile, resetProfile } = useProfile()
@@ -66,13 +66,11 @@ watch(offlineReady, (val) => {
 // Workspace data loader
 watch(user, async (currentUser) => {
   if (!currentUser) {
-    if (!userId.value) {
-      items.value = []
-      friends.value = []
-      pendingIncoming.value = []
-      resetProfile()
-      isSettingsOpen.value = false
-    }
+    items.value = []
+    friends.value = []
+    pendingIncoming.value = []
+    resetProfile()
+    isSettingsOpen.value = false
     return
   }
 
@@ -85,18 +83,6 @@ watch(user, async (currentUser) => {
     ])
   }
 }, { immediate: true })
-
-onMounted(async () => {
-  if (userId.value) {
-    await loadProfile()
-    if (isApproved.value) {
-      await Promise.all([
-        loadItems(),
-        loadFriends()
-      ])
-    }
-  }
-})
 </script>
 
 <template>
@@ -110,9 +96,6 @@ onMounted(async () => {
         :user="user"
         @open-settings="isSettingsOpen = true"
       />
-
-      <!-- Offline and Sync Status Banner -->
-      <OfflineBanner />
 
       <!-- Main viewport -->
       <main :class="user && isApproved ? 'pb-safe-nav md:pb-8' : ''">

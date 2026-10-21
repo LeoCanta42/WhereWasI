@@ -1,54 +1,16 @@
 import type { Database } from '~/types/database.types'
 import type { FriendProfile, Friendship, MediaItem, Profile } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
-import { getAppCache, setAppCache } from '~/utils/offlineStorage'
 
 export function useFriends() {
   const supabase = useSupabaseClient<Database>()
   const { userId, userEmail } = useCurrentUser()
   const toast = useToast()
 
-  const friends = useState<FriendProfile[]>('friends-list', () => {
-    if (import.meta.client) {
-      try {
-        const raw = localStorage.getItem('where_was_i_friends_snapshot')
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
-  const pendingIncoming = useState<FriendProfile[]>('pending-incoming-friends', () => {
-    if (import.meta.client) {
-      try {
-        const raw = localStorage.getItem('where_was_i_incoming_snapshot')
-        if (raw) {
-          const parsed = JSON.parse(raw)
-          if (Array.isArray(parsed)) return parsed
-        }
-      } catch {
-        return []
-      }
-    }
-    return []
-  })
+  const friends = useState<FriendProfile[]>('friends-list', () => [])
+  const pendingIncoming = useState<FriendProfile[]>('pending-incoming-friends', () => [])
   const pendingOutgoing = useState<FriendProfile[]>('pending-outgoing-friends', () => [])
   const loading = useState<boolean>('friends-loading', () => false)
-
-  function persistFriendsSnapshot(fList: FriendProfile[], incList: FriendProfile[]) {
-    if (import.meta.client) {
-      try {
-        localStorage.setItem('where_was_i_friends_snapshot', JSON.stringify(fList))
-        localStorage.setItem('where_was_i_incoming_snapshot', JSON.stringify(incList))
-      } catch {
-        // ignore
-      }
-    }
-  }
 
   async function loadFriends() {
     const id = userId.value
@@ -57,20 +19,6 @@ export function useFriends() {
       pendingIncoming.value = []
       pendingOutgoing.value = []
       return
-    }
-
-    // Try reading cached friends first
-    const cached = await getAppCache<{
-      friends: FriendProfile[]
-      incoming: FriendProfile[]
-      outgoing: FriendProfile[]
-    }>(`friends_${id}`)
-
-    if (cached) {
-      friends.value = cached.friends || []
-      pendingIncoming.value = cached.incoming || []
-      pendingOutgoing.value = cached.outgoing || []
-      persistFriendsSnapshot(friends.value, pendingIncoming.value)
     }
 
     loading.value = true
@@ -82,7 +30,7 @@ export function useFriends() {
         .or(`requester_id.eq.${id},addressee_id.eq.${id}`)
 
       if (friendshipsError) {
-        console.warn('Network or error loading friendships:', friendshipsError)
+        console.error('Error loading friendships:', friendshipsError)
         return
       }
 
@@ -91,7 +39,6 @@ export function useFriends() {
         friends.value = []
         pendingIncoming.value = []
         pendingOutgoing.value = []
-        await setAppCache(`friends_${id}`, { friends: [], incoming: [], outgoing: [] })
         return
       }
 
@@ -106,7 +53,7 @@ export function useFriends() {
         .in('id', uniqueIds)
 
       if (profilesError) {
-        console.warn('Network or error loading friend profiles:', profilesError)
+        console.error('Error loading friend profiles:', profilesError)
         return
       }
 
@@ -145,15 +92,8 @@ export function useFriends() {
       friends.value = acceptedList
       pendingIncoming.value = incomingList
       pendingOutgoing.value = outgoingList
-      persistFriendsSnapshot(acceptedList, incomingList)
-
-      await setAppCache(`friends_${id}`, {
-        friends: acceptedList,
-        incoming: incomingList,
-        outgoing: outgoingList
-      })
     } catch (err) {
-      console.warn('Unexpected error loading friends (offline):', err)
+      console.error('Unexpected error loading friends:', err)
     } finally {
       loading.value = false
     }

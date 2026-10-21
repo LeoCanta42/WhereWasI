@@ -94,15 +94,6 @@ watch(() => props.open, (isOpen) => {
 })
 
 async function handleAiAutocomplete() {
-  if (import.meta.client && !navigator.onLine) {
-    toast.add({
-      title: 'Sei offline',
-      description: 'L\'autocompletamento AI con Gemini richiede una connessione a Internet.',
-      color: 'warning'
-    })
-    return
-  }
-
   const cleanTitle = title.value.trim()
   if (!cleanTitle) {
     toast.add({

@@ -6,6 +6,8 @@ import { useProfile } from '~/composables/useProfile'
 import { useAppearance } from '~/composables/useAppearance'
 import { usePwa } from '~/composables/usePwa'
 import { useQuickAdd } from '~/composables/useQuickAdd'
+import { useOfflineSync } from '~/composables/useOfflineSync'
+import { offlineStorage } from '~/utils/offlineStorage'
 import { appleSplashLinks } from '~/utils/appleSplash'
 
 useSeoMeta({
@@ -22,6 +24,7 @@ const { loadFriends, friends, pendingIncoming } = useFriends()
 const { status: approvalStatus, isApproved, isAdmin, loaded: profileLoaded, loadProfile, resetProfile } = useProfile()
 const { needRefresh, offlineReady, updateApp } = usePwa()
 const { openQuickAdd, isQuickAddOpen, quickAddInitialType } = useQuickAdd()
+const { isOnline, isSyncing, pendingCount, processQueue } = useOfflineSync()
 const route = useRoute()
 
 // Route protection watcher (e.g. if user is on /admin and logs out or switches to non-admin)
@@ -63,14 +66,22 @@ watch(offlineReady, (val) => {
   })
 })
 
+onMounted(() => {
+  if (isOnline.value) {
+    processQueue()
+  }
+})
+
 // Workspace data loader
 watch(user, async (currentUser) => {
   if (!currentUser) {
-    items.value = []
-    friends.value = []
-    pendingIncoming.value = []
-    resetProfile()
-    isSettingsOpen.value = false
+    if (offlineStorage.isLoggedOut()) {
+      items.value = []
+      friends.value = []
+      pendingIncoming.value = []
+      resetProfile()
+      isSettingsOpen.value = false
+    }
     return
   }
 
@@ -96,6 +107,33 @@ watch(user, async (currentUser) => {
         :user="user"
         @open-settings="isSettingsOpen = true"
       />
+
+      <!-- Offline / Sync banner -->
+      <aside
+        v-if="!isOnline"
+        role="status"
+        aria-live="polite"
+        class="sticky top-16 z-20 flex items-center justify-center gap-2 border-b border-amber-300/40 bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-900 transition-all dark:border-amber-900/40 dark:bg-amber-950/80 dark:text-amber-200"
+      >
+        <UIcon name="i-lucide-wifi-off" class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+        <span>Sei offline. Le modifiche vengono salvate sul dispositivo e sincronizzate appena torna la connessione.</span>
+        <span
+          v-if="pendingCount > 0"
+          class="rounded-full bg-amber-200/70 px-2 py-0.5 text-[11px] font-bold dark:bg-amber-900/70"
+        >
+          {{ pendingCount }} in attesa
+        </span>
+      </aside>
+
+      <aside
+        v-else-if="isSyncing || pendingCount > 0"
+        role="status"
+        aria-live="polite"
+        class="sticky top-16 z-20 flex items-center justify-center gap-2 border-b border-indigo-300/40 bg-indigo-50 px-4 py-2 text-xs font-semibold text-indigo-900 transition-all dark:border-indigo-900/40 dark:bg-indigo-950/80 dark:text-indigo-200"
+      >
+        <UIcon name="i-lucide-refresh-cw" class="h-4 w-4 shrink-0 animate-spin text-indigo-600 dark:text-indigo-400" />
+        <span>{{ isSyncing ? 'Sincronizzazione modifiche in corso...' : `${pendingCount} modifiche in attesa di sincronizzazione...` }}</span>
+      </aside>
 
       <!-- Main viewport -->
       <main :class="user && isApproved ? 'pb-safe-nav md:pb-8' : ''">

@@ -65,6 +65,12 @@ export default defineNuxtConfig({
     redirect: false
   },
 
+  nitro: {
+    prerender: {
+      routes: ['/', '/friends']
+    }
+  },
+
   pwa: {
     registerType: 'autoUpdate',
     registerWebManifestInRouteRules: true,
@@ -104,7 +110,7 @@ export default defineNuxtConfig({
       launch_handler: { client_mode: 'navigate-existing' }
     },
     workbox: {
-      globPatterns: ['**/*.{js,css,ico,png,svg,woff2}'],
+      globPatterns: ['**/*.{js,css,ico,png,svg,woff2,html,json}'],
       globIgnores: ['**/screenshots/**', '**/splash/**'],
       navigateFallback: '/',
       navigateFallbackDenylist: [/^\/api/],

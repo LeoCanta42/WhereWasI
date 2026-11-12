@@ -1,23 +1,48 @@
 import type { Database } from '~/types/database.types'
 import type { FriendProfile, Friendship, MediaItem, Profile } from '~/types'
 import { useCurrentUser } from '~/composables/useCurrentUser'
+import { offlineStorage } from '~/utils/offlineStorage'
+import { isNetworkError } from '~/utils/network'
 
 export function useFriends() {
-  const supabase = useSupabaseClient<Database>()
+  const supabase = useNuxtApp().$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
+    ?? useSupabaseClient<Database>()
   const { userId, userEmail } = useCurrentUser()
   const toast = useToast()
 
-  const friends = useState<FriendProfile[]>('friends-list', () => [])
+  const initialFriends = import.meta.client && !offlineStorage.isLoggedOut()
+    ? offlineStorage.getFriends()
+    : []
+
+  const friends = useState<FriendProfile[]>('friends-list', () => initialFriends)
   const pendingIncoming = useState<FriendProfile[]>('pending-incoming-friends', () => [])
   const pendingOutgoing = useState<FriendProfile[]>('pending-outgoing-friends', () => [])
   const loading = useState<boolean>('friends-loading', () => false)
 
+  // Hydrate client-side if needed
+  if (import.meta.client && !offlineStorage.isLoggedOut() && friends.value.length === 0) {
+    const cached = offlineStorage.getFriends()
+    if (cached.length > 0) {
+      friends.value = cached
+    }
+  }
+
   async function loadFriends() {
     const id = userId.value
     if (!id) {
-      friends.value = []
-      pendingIncoming.value = []
-      pendingOutgoing.value = []
+      if (offlineStorage.isLoggedOut()) {
+        friends.value = []
+        pendingIncoming.value = []
+        pendingOutgoing.value = []
+      }
+      return
+    }
+
+    if (import.meta.client && typeof navigator !== 'undefined' && !navigator.onLine) {
+      const cached = offlineStorage.getFriends()
+      if (cached.length > 0) {
+        friends.value = cached
+      }
       return
     }
 
@@ -30,7 +55,13 @@ export function useFriends() {
         .or(`requester_id.eq.${id},addressee_id.eq.${id}`)
 
       if (friendshipsError) {
-        console.error('Error loading friendships:', friendshipsError)
+        if (!isNetworkError(friendshipsError)) {
+          console.error('Error loading friendships:', friendshipsError)
+        }
+        const cached = offlineStorage.getFriends()
+        if (cached.length > 0) {
+          friends.value = cached
+        }
         return
       }
 
@@ -39,6 +70,7 @@ export function useFriends() {
         friends.value = []
         pendingIncoming.value = []
         pendingOutgoing.value = []
+        offlineStorage.setFriends([])
         return
       }
 
@@ -53,7 +85,13 @@ export function useFriends() {
         .in('id', uniqueIds)
 
       if (profilesError) {
-        console.error('Error loading friend profiles:', profilesError)
+        if (!isNetworkError(profilesError)) {
+          console.error('Error loading friend profiles:', profilesError)
+        }
+        const cached = offlineStorage.getFriends()
+        if (cached.length > 0) {
+          friends.value = cached
+        }
         return
       }
 
@@ -90,10 +128,17 @@ export function useFriends() {
       }
 
       friends.value = acceptedList
+      offlineStorage.setFriends(acceptedList)
       pendingIncoming.value = incomingList
       pendingOutgoing.value = outgoingList
     } catch (err) {
-      console.error('Unexpected error loading friends:', err)
+      if (!isNetworkError(err)) {
+        console.error('Unexpected error loading friends:', err)
+      }
+      const cached = offlineStorage.getFriends()
+      if (cached.length > 0) {
+        friends.value = cached
+      }
     } finally {
       loading.value = false
     }

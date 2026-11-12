@@ -1,11 +1,13 @@
 import type { Database } from '~/types/database.types'
+import type { JwtPayload } from '@supabase/supabase-js'
 import { useCurrentUser } from '~/composables/useCurrentUser'
 import { MIN_PASSWORD_LENGTH } from '~/utils/password'
+import { offlineStorage } from '~/utils/offlineStorage'
 
 export function useAuth() {
-  const supabase = useSupabaseClient<Database>()
-  const user = useSupabaseUser()
-  const { userEmail } = useCurrentUser()
+  const supabase = useNuxtApp().$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
+    ?? useSupabaseClient<Database>()
+  const { user, userEmail, rawUser } = useCurrentUser()
   const toast = useToast()
 
   const loading = ref(false)
@@ -13,7 +15,7 @@ export function useAuth() {
   async function loginWithEmail(email: string, password: string): Promise<boolean> {
     loading.value = true
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password
       })
@@ -25,6 +27,17 @@ export function useAuth() {
           color: 'error'
         })
         return false
+      }
+
+      offlineStorage.setLoggedOut(false)
+      if (data?.user) {
+        const payload: JwtPayload = {
+          sub: data.user.id,
+          email: data.user.email,
+          aud: data.user.aud,
+          role: data.user.role
+        }
+        offlineStorage.setUser(payload)
       }
 
       toast.add({
@@ -69,6 +82,16 @@ export function useAuth() {
       }
 
       if (data.session) {
+        offlineStorage.setLoggedOut(false)
+        if (data?.user) {
+          const payload: JwtPayload = {
+            sub: data.user.id,
+            email: data.user.email,
+            aud: data.user.aud,
+            role: data.user.role
+          }
+          offlineStorage.setUser(payload)
+        }
         toast.add({
           title: 'Account creato!',
           description: 'Il tuo account è stato creato ed è in attesa di approvazione da parte dell\'amministratore.',
@@ -154,8 +177,19 @@ export function useAuth() {
   }
 
   async function logout(): Promise<void> {
+    loading.value = true
     try {
-      await supabase.auth.signOut()
+      offlineStorage.clearAll()
+      rawUser.value = null
+      const offlineUserState = useState<JwtPayload | null>('wherewasi-offline-user', () => null)
+      offlineUserState.value = null
+
+      try {
+        await supabase.auth.signOut()
+      } catch (signOutErr) {
+        console.warn('SignOut error (offline or timeout):', signOutErr)
+      }
+
       await navigateTo('/')
       toast.add({
         title: 'Disconnesso',
@@ -164,6 +198,8 @@ export function useAuth() {
       })
     } catch (err) {
       console.error('Logout error:', err)
+    } finally {
+      loading.value = false
     }
   }
 

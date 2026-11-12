@@ -5,6 +5,7 @@ import { useAppearance } from '~/composables/useAppearance'
 import { useFriends } from '~/composables/useFriends'
 import { useQuickAdd } from '~/composables/useQuickAdd'
 import { usePwa } from '~/composables/usePwa'
+import { useOfflineSync } from '~/composables/useOfflineSync'
 
 const props = defineProps<{
   user: any
@@ -22,6 +23,7 @@ const { theme, setTheme, isDark } = useAppearance()
 const { pendingIncoming, friends } = useFriends()
 const { openQuickAdd } = useQuickAdd()
 const { canInstall, isInstalled, install, needRefresh, updateApp } = usePwa()
+const { isOnline, isSyncing, pendingCount } = useOfflineSync()
 
 const incomingCount = computed(() => pendingIncoming.value.length)
 
@@ -90,6 +92,24 @@ const avatarInitial = computed(() => {
 
       <!-- Actions -->
       <div class="flex items-center gap-2">
+        <!-- Offline / Sync Status Badge -->
+        <span
+          v-if="!isOnline"
+          class="inline-flex items-center gap-1 rounded-xl bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800 dark:bg-amber-950/80 dark:text-amber-300"
+          title="Modalità non in linea"
+        >
+          <UIcon name="i-lucide-wifi-off" class="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+          <span class="hidden sm:inline">Offline</span>
+        </span>
+        <span
+          v-else-if="isSyncing || pendingCount > 0"
+          class="inline-flex items-center gap-1 rounded-xl bg-indigo-100 px-2.5 py-1 text-xs font-bold text-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300"
+          :title="isSyncing ? 'Sincronizzazione in corso...' : `${pendingCount} modifiche in attesa`"
+        >
+          <UIcon name="i-lucide-refresh-cw" class="h-3.5 w-3.5 animate-spin text-indigo-600 dark:text-indigo-400" />
+          <span class="hidden sm:inline">{{ isSyncing ? 'Sincronizzo...' : `${pendingCount} in attesa` }}</span>
+        </span>
+
         <!-- New PWA Version Available Button -->
         <button
           v-if="needRefresh"

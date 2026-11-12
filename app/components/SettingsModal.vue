@@ -5,6 +5,7 @@ import { useAppearance } from '~/composables/useAppearance'
 import { useProfile } from '~/composables/useProfile'
 import { useAuth } from '~/composables/useAuth'
 import { usePwa } from '~/composables/usePwa'
+import { useOfflineSync } from '~/composables/useOfflineSync'
 
 const props = defineProps<{
   open: boolean
@@ -19,6 +20,7 @@ const { theme, setTheme, setAccent } = useAppearance()
 const { profile, updateProfile } = useProfile()
 const { changePassword, logout } = useAuth()
 const { canInstall, isInstalled, install, needRefresh, updateApp, manualInstallHint, offlineReady } = usePwa()
+const { isOnline, isSyncing, pendingCount, processQueue } = useOfflineSync()
 
 const displayName = ref('')
 const username = ref('')
@@ -310,6 +312,68 @@ async function handleChangePassword() {
             {{ isChangingPass ? 'Aggiornamento...' : 'Cambia Password' }}
           </button>
         </form>
+      </div>
+
+      <!-- Offline & Synchronization Section -->
+      <div class="space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">Dati Offline & Sincronizzazione</h3>
+          <span
+            v-if="!isOnline"
+            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+          >
+            <UIcon name="i-lucide-wifi-off" class="h-3 w-3" />
+            Non in linea
+          </span>
+          <span
+            v-else-if="pendingCount > 0"
+            class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-950/60 dark:text-amber-300"
+          >
+            <UIcon name="i-lucide-clock" class="h-3 w-3" />
+            {{ pendingCount }} in sospeso
+          </span>
+          <span
+            v-else
+            class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+          >
+            <UIcon name="i-lucide-check-circle" class="h-3 w-3" />
+            Sincronizzato
+          </span>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3.5 space-y-2.5 dark:border-slate-800 dark:bg-slate-900/60">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div
+                class="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
+                :class="isOnline ? 'bg-emerald-600' : 'bg-amber-500'"
+              >
+                <UIcon :name="isOnline ? 'i-lucide-wifi' : 'i-lucide-wifi-off'" class="h-4.5 w-4.5" />
+              </div>
+              <div>
+                <p class="text-xs font-bold text-slate-900 dark:text-white">
+                  {{ isOnline ? 'Connesso al server' : 'Modalità non in linea' }}
+                </p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                  {{ pendingCount > 0
+                    ? `${pendingCount} ${pendingCount === 1 ? 'modifica in attesa' : 'modifiche in attesa'} di sincronizzazione.`
+                    : 'Tutti i tuoi elementi e progressi sono salvati anche in locale.' }}
+                </p>
+              </div>
+            </div>
+
+            <button
+              v-if="isOnline && pendingCount > 0"
+              type="button"
+              :disabled="isSyncing"
+              class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 disabled:opacity-50 dark:bg-indigo-500"
+              @click="processQueue"
+            >
+              <UIcon name="i-lucide-refresh-cw" class="h-3.5 w-3.5" :class="{ 'animate-spin': isSyncing }" />
+              <span>{{ isSyncing ? 'Sincronizzo...' : 'Sincronizza ora' }}</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       <!-- PWA & Mobile App Section -->

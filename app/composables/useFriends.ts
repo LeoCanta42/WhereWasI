@@ -5,7 +5,7 @@ import { offlineStorage } from '~/utils/offlineStorage'
 import { isNetworkError } from '~/utils/network'
 
 export function useFriends() {
-  const supabase = useNuxtApp().$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
+  const supabase = (useNuxtApp() as any).$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
     ?? useSupabaseClient<Database>()
   const { userId, userEmail } = useCurrentUser()
   const toast = useToast()

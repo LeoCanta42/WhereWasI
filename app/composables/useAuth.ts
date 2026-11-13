@@ -5,7 +5,7 @@ import { MIN_PASSWORD_LENGTH } from '~/utils/password'
 import { offlineStorage } from '~/utils/offlineStorage'
 
 export function useAuth() {
-  const supabase = useNuxtApp().$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
+  const supabase = (useNuxtApp() as any).$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
     ?? useSupabaseClient<Database>()
   const { user, userEmail, rawUser } = useCurrentUser()
   const toast = useToast()
@@ -32,10 +32,15 @@ export function useAuth() {
       offlineStorage.setLoggedOut(false)
       if (data?.user) {
         const payload: JwtPayload = {
+          iss: '',
           sub: data.user.id,
-          email: data.user.email,
           aud: data.user.aud,
-          role: data.user.role
+          exp: Math.floor(Date.now() / 1000) + 3600,
+          iat: Math.floor(Date.now() / 1000),
+          aal: 'aal1',
+          session_id: '',
+          email: data.user.email,
+          role: data.user.role ?? ''
         }
         offlineStorage.setUser(payload)
       }
@@ -85,10 +90,15 @@ export function useAuth() {
         offlineStorage.setLoggedOut(false)
         if (data?.user) {
           const payload: JwtPayload = {
+            iss: '',
             sub: data.user.id,
-            email: data.user.email,
             aud: data.user.aud,
-            role: data.user.role
+            exp: Math.floor(Date.now() / 1000) + 3600,
+            iat: Math.floor(Date.now() / 1000),
+            aal: 'aal1',
+            session_id: '',
+            email: data.user.email,
+            role: data.user.role ?? ''
           }
           offlineStorage.setUser(payload)
         }

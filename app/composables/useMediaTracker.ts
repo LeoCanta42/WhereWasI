@@ -14,7 +14,7 @@ import {
 } from '~/utils/media'
 
 export function useMediaTracker() {
-  const supabase = useNuxtApp().$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
+  const supabase = (useNuxtApp() as any).$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
     ?? useSupabaseClient<Database>()
   const { userId } = useCurrentUser()
   const toast = useToast()
@@ -269,7 +269,7 @@ export function useMediaTracker() {
     if (!currentUserId) return false
 
     const oldIndex = items.value.findIndex((i) => i.id === id)
-    const oldItem = oldIndex !== -1 ? { ...items.value[oldIndex] } : null
+    const oldItem: MediaItem | null = oldIndex !== -1 ? { ...(items.value[oldIndex] as MediaItem) } : null
 
     // Optimistic local update
     if (oldItem && oldIndex !== -1) {
@@ -407,7 +407,7 @@ export function useMediaTracker() {
 
   async function deleteItem(id: number): Promise<boolean> {
     const oldIndex = items.value.findIndex((i) => i.id === id)
-    const oldItem = oldIndex !== -1 ? { ...items.value[oldIndex] } : null
+    const oldItem: MediaItem | null = oldIndex !== -1 ? { ...(items.value[oldIndex] as MediaItem) } : null
 
     // Optimistic removal
     items.value = items.value.filter((i) => i.id !== id)

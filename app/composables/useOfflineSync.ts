@@ -66,7 +66,7 @@ export function useOfflineSync() {
 
     isSyncing.value = true
 
-    const supabase = useNuxtApp().$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
+    const supabase = (useNuxtApp() as any).$supabase?.client as ReturnType<typeof useSupabaseClient<Database>> | undefined
       ?? useSupabaseClient<Database>()
     if (!supabase) {
       isSyncing.value = false
